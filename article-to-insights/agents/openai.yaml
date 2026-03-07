@@ -1,0 +1,4 @@
+interface:
+  display_name: "Article to Insights"
+  short_description: "Read article URLs into structured insights"
+  default_prompt: "Use $article-to-insights, or say read <url> / 读 <url>, to turn a single article URL into structured insights, explanations, and next-step recommendations."
