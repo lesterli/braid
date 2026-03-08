@@ -2,8 +2,6 @@
 
 Validated agent skills distilled from real-world practice.
 
-Each skill is a self-contained prompt package — including workflow, references, guardrails, and scripts — that can be plugged into any LLM-powered agent to handle a specific task reliably.
-
 ## Skills
 
 | Skill | Description |
@@ -42,9 +40,8 @@ skill-name/
 
 ## TODO
 
-- [ ] Publish skills to the Claude Code skill marketplace
 - [ ] Publish skills to [ClawHub](https://clawhub.com)
-- [ ] Add skill evaluation framework (automated quality & consistency checks)
+- [ ] Add skill evaluation
 - [ ] Add more skills
 
 ## License
