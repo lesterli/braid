@@ -7,6 +7,8 @@
 set -euo pipefail
 
 url="${1:?Usage: validate-url.sh <url>}"
+wechat_captcha_url_pattern='mp.weixin.qq.com/mp/wappoc_appmsgcaptcha'
+wechat_verification_pattern='weui-msg__title|id="js_verify"|wappoc_appmsgcaptcha|TCaptcha\.js'
 
 response=$(curl -sL -o /dev/null -w '%{http_code}\t%{content_type}\t%{size_download}\t%{url_effective}' \
   -A "Mozilla/5.0" --max-time 15 "$url" 2>/dev/null) || {
@@ -25,6 +27,19 @@ echo "url: $url"
 echo "status: $http_code"
 echo "content_type: $content_type"
 echo "size_bytes: $size_bytes"
+
+if echo "$final_url" | grep -qi "$wechat_captcha_url_pattern"; then
+  echo "verdict: unreachable (verification wall)"
+  exit 0
+fi
+
+body_sample=$(curl -sL -A "Mozilla/5.0" --max-time 15 --range 0-32768 "$url" 2>/dev/null || true)
+
+if [ -n "$body_sample" ] && printf '%s' "$body_sample" | grep -Eqi \
+  "$wechat_verification_pattern"; then
+  echo "verdict: unreachable (verification wall)"
+  exit 0
+fi
 
 # Verdict — always exit 0; caller reads the verdict line to decide next step.
 if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 400 ]; then
