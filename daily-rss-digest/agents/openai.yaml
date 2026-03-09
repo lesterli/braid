@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daily RSS Digest"
+  short_description: "Enable a native daily RSS digest in OpenClaw"
+  default_prompt: "Use $daily-rss-digest, or say 帮我开通每日 RSS digest, to enable or manage a daily RSS digest in the current OpenClaw chat."
