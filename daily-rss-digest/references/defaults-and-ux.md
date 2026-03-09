@@ -18,14 +18,15 @@ Use these defaults unless the user explicitly overrides them.
 
 Prefer short, result-oriented phrasing:
 
-- `帮我开通每日 RSS digest`
-- `帮我开通每日 RSS digest，发到 TG`
-- `查看每日 RSS digest 状态`
+- `开通每日摘要`
+- `开始每日摘要`
+- `开通每日摘要，发到 TG`
+- `查看摘要状态`
 - `暂停每日 RSS digest`
 - `恢复每日 RSS digest`
 - `关闭每日 RSS digest`
 
-When the user is already in the target TG chat, prefer the first form and infer the destination from context.
+When the user is already in the target TG chat, prefer `开通每日摘要` and infer the destination from context.
 
 ## Confirmation Style
 
