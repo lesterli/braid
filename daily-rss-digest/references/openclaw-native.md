@@ -1,6 +1,6 @@
 # OpenClaw Native Workflow
 
-Use this reference when enabling or managing the digest inside OpenClaw.
+Use this reference when enabling or managing the daily summary inside OpenClaw.
 
 ## Core Principle
 
@@ -50,22 +50,20 @@ openclaw cron add \
   --announce \
   --channel telegram \
   --to "123456789" \
-  --message 'Use $daily-rss-digest to generate today'"'"'s digest from source_set=default. Read references/default-feeds.md, fetch recent entries directly from those feeds, and send one concise markdown digest. If nothing is worth reading today, output "今日无高质量内容".'
+  --message 'Use $daily-rss-digest to generate today'"'"'s summary from source_set=default. Read references/default-feeds.md, fetch recent entries directly from those feeds, and send one concise markdown summary in Chinese. If nothing is worth reading today, output "今日无高质量内容".'
 ```
 
 If OpenClaw exposes the same capability through a tool API instead of the CLI, use that native surface instead of shelling out.
 
-## Status, Pause, Resume, Disable
+## Status And Disable
 
 - `status`: inspect the job matching the deterministic name
-- `pause`: disable the existing job when the host supports pause; otherwise remove it
-- `resume`: re-enable the paused job or recreate it with the same defaults
 - `disable`: remove the existing job
 
 ## Verification
 
 After `enable`, prefer one of these in order:
 
-1. run the new cron job immediately
-2. trigger the same isolated message once
+1. send the enable confirmation, then run the new cron job immediately and send one real summary for today
+2. trigger the same isolated message once and ensure it delivers a real summary
 3. send a short confirmation message and state when the first automatic run will happen

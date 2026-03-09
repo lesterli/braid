@@ -1,11 +1,11 @@
 ---
 name: daily-rss-digest
-description: Enable and manage an OpenClaw-native daily RSS digest. Use when the user asks in Chinese or English to start, enable, subscribe to, inspect, pause, resume, disable, or retarget a daily RSS summary, for example `开通每日摘要`, `开始每日摘要`, `查看摘要状态`, `暂停每日摘要`, `恢复每日摘要`, `关闭每日摘要`, or `帮我开通每日 RSS digest`. Default to the current chat when invoked inside Telegram, Slack, or another chat surface; default the feed bundle, timezone to Asia/Shanghai, and send time to 08:00 unless the user overrides them. Do not switch to shell-script setup, cron installation, or Miniflux deployment when this skill applies.
+description: Enable and manage an OpenClaw-native daily summary from RSS feeds. Use when the user asks in Chinese or English to start, enable, inspect, disable, or retarget a daily summary, for example `开通每日摘要`, `开始每日摘要`, `查看摘要状态`, `关闭每日摘要`, or `帮我开通每日 RSS digest`. Default to the current chat when invoked inside Telegram, Slack, or another chat surface; default the feed bundle, timezone to Asia/Shanghai, and send time to 08:00 unless the user overrides them. Do not switch to shell-script setup, cron installation, or Miniflux deployment when this skill applies.
 ---
 
-# Daily RSS Digest
+# Daily Summary
 
-Turn one chat message into a recurring OpenClaw automation that sends one concise RSS digest per day.
+Turn one chat message into a recurring OpenClaw automation that sends one concise daily summary per day.
 
 Treat OpenClaw as the runtime. Do not deploy Miniflux, Docker, custom adapters, or external schedulers for this skill.
 
@@ -15,7 +15,7 @@ Treat OpenClaw as the runtime. Do not deploy Miniflux, Docker, custom adapters, 
 - Enablement must be explicit.
 - When the request comes from a chat, deliver back to that same chat by default.
 - Ask for a target only when there is no current chat context or the user explicitly wants a different destination.
-- Keep defaults opinionated: built-in feeds, `Asia/Shanghai`, `08:00`, one concise digest per day.
+- Keep defaults opinionated: built-in feeds, `Asia/Shanghai`, `08:00`, one concise daily summary per day.
 
 ## Preconditions
 
@@ -36,8 +36,6 @@ Map user requests to one of these actions:
 
 - `enable`: `开通每日摘要` or `开始每日摘要`
 - `status`: `查看摘要状态`
-- `pause`: `暂停每日摘要`
-- `resume`: `恢复每日摘要`
 - `disable`: `关闭每日摘要`
 - `adjust`: change target, time, timezone, or source set
 
@@ -51,23 +49,22 @@ Resolve intent before touching cron jobs.
    - Ask a follow-up only when the target is missing or ambiguous.
 2. Reuse or update an existing job for the same target instead of creating duplicates. Use the deterministic naming pattern from [references/openclaw-native.md](./references/openclaw-native.md).
 3. Create or update one isolated daily cron job using OpenClaw's native scheduler.
-4. The scheduled message must explicitly invoke `$daily-rss-digest` to generate the digest from the built-in feed bundle and deliver it back to the resolved target.
-5. Prefer a real immediate run of the scheduled job as the test. If the host cannot run jobs immediately, send one short test confirmation to the same target.
-6. Return a short confirmation with target, schedule, timezone, source set, and test result.
+4. The scheduled message must explicitly invoke `$daily-rss-digest` to generate the summary from the built-in feed bundle and deliver it back to the resolved target.
+5. Send the enable confirmation first.
+6. After the confirmation, prefer a real immediate run that sends one actual summary for today. Do not send only a dry-run confirmation when the host can run the job immediately.
+7. Only if the host cannot run jobs immediately, keep the confirmation terse and state when the first automatic run will happen.
 
 ## Daily Run Workflow
 
 1. Read [references/default-feeds.md](./references/default-feeds.md).
 2. Fetch recent items directly from those RSS or Atom feeds with the host's available retrieval tools.
 3. Focus on recent entries, deduplicate obvious repeats, and score for signal over noise.
-4. Send `1-5` high-signal items. If nothing clears the bar, still send one short heartbeat digest saying there is no high-quality content today.
+4. Send `1-5` high-signal items. If nothing clears the bar, still send one short heartbeat summary saying there is no high-quality content today.
 5. Keep the output optimized for chat delivery, not long-form reading.
 
 ## Management Workflow
 
-- `status`: inspect the existing OpenClaw cron job and report enabled or paused state, target, schedule, timezone, and source set
-- `pause`: disable the existing cron job if supported; otherwise remove it and say it was removed
-- `resume`: recreate or re-enable the cron job using the saved defaults
+- `status`: inspect the existing OpenClaw cron job and report whether the daily summary is enabled, plus target, schedule, timezone, and source set
 - `disable`: remove the existing cron job and confirm that daily pushes have stopped
 - `adjust`: update only the requested field and preserve the rest
 
@@ -82,14 +79,13 @@ Resolve intent before touching cron jobs.
 
 ## Response Shape
 
-For `enable`, reply with `4-6` short lines:
+For `enable`, reply with `4-5` short lines before the actual summary message is sent:
 
 - enabled state
 - resolved target
 - send time and timezone
 - source set
-- test result
-- management hint such as `查看状态 / 暂停 / 关闭`
+- management hint such as `查看状态 / 关闭`
 
 For the other actions, reply with a short operational confirmation.
 

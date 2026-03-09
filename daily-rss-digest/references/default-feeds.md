@@ -1,8 +1,8 @@
 # Default Feeds
 
-Use this built-in source set when the user does not provide a custom feed bundle.
+Use this built-in source set when the user does not provide a custom source set.
 
-Keep the default list intentionally small. The goal is a dependable starter digest, not broad coverage.
+Keep the default list intentionally small. The goal is a dependable starter summary, not broad coverage.
 
 ## Feed URLs
 
@@ -17,4 +17,4 @@ Keep the default list intentionally small. The goal is a dependable starter dige
 - Ignore obviously duplicated titles or canonical URLs
 - Cap candidate inspection per feed if the feed is noisy
 - Optimize for new insights, engineering depth, and clear original thinking
-- If the digest would be all weak items, send the empty-day heartbeat instead
+- If the summary would be all weak items, send the empty-day heartbeat instead
