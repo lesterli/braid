@@ -20,7 +20,6 @@ Use these defaults unless the user explicitly overrides them.
 Prefer short, result-oriented phrasing:
 
 - `开通每日摘要`
-- `开始每日摘要`
 - `开通每日摘要，发到 TG`
 - `查看摘要状态`
 - `关闭每日摘要`

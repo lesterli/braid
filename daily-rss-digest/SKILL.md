@@ -1,6 +1,6 @@
 ---
 name: daily-rss-digest
-description: Enable and manage an OpenClaw-native daily summary from RSS feeds. Use when the user asks in Chinese or English to start, enable, inspect, disable, or retarget a daily summary, for example `开通每日摘要`, `开始每日摘要`, `查看摘要状态`, `关闭每日摘要`, or `帮我开通每日 RSS digest`. Default to the current chat when invoked inside Telegram, Slack, or another chat surface; default the feed bundle, timezone to Asia/Shanghai, and send time to 08:00 unless the user overrides them. Do not switch to shell-script setup, cron installation, or Miniflux deployment when this skill applies.
+description: Enable and manage an OpenClaw-native daily summary from RSS feeds. Use when the user asks in Chinese or English to enable, inspect, disable, or retarget a daily summary, for example `开通每日摘要`, `查看摘要状态`, or `关闭每日摘要`. Default to the current chat when invoked inside Telegram, Slack, or another chat surface; default the feed bundle, timezone to Asia/Shanghai, and send time to 08:00 unless the user overrides them. Do not switch to shell-script setup, cron installation, or Miniflux deployment when this skill applies.
 ---
 
 # Daily Summary
@@ -34,7 +34,7 @@ Treat OpenClaw as the runtime. Do not deploy Miniflux, Docker, custom adapters, 
 
 Map user requests to one of these actions:
 
-- `enable`: `开通每日摘要` or `开始每日摘要`
+- `enable`: `开通每日摘要`
 - `status`: `查看摘要状态`
 - `disable`: `关闭每日摘要`
 - `adjust`: change target, time, timezone, or source set
