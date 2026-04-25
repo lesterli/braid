@@ -10,7 +10,7 @@ This repository follows the open `SKILL.md` directory format used across agent e
 |-------|-------------|
 | [article-to-insights](./article-to-insights/) | Turn one article URL into a structured reading result: core summary, relevance analysis, and actionable recommendation. |
 | [daily-curator](./daily-curator/) | Generate a curated daily reading list of high-quality articles from 18+ trusted sources, with scoring, dedup, and category filtering. |
-| [profile-audit](./profile-audit/) | Diagnose a 小红书 / Twitter profile from a screenshot. Scores 5 funnel-aligned dimensions with binary sub-checks, returns a band score and concrete improvement edits. |
+| [profile-audit](./profile-audit/) | Diagnose a 小红书 / Twitter profile from a screenshot. Scoped to service-providing OPC (designer / consultant / coach / freelancer / SaaS founder). Scores 5 funnel-aligned dimensions with binary sub-checks, returns a band score and concrete improvement edits. |
 
 ## Install
 

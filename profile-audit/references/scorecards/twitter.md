@@ -1,5 +1,16 @@
 # Twitter / X 主页 评分卡
 
+## 适用范围
+
+Twitter 上的 OPC 比小红书多样，scope contract 也更细：
+
+✅ **服务型 OPC**：和小红书逻辑一致——独立顾问 / freelancer / 教练 / 设计师，目标是 inbound DM 或 email。所有维度按字面适用。
+✅ **SaaS / Indie Hacker / build-in-public**：**Twitter 上的主流 OPC 类型**。维度 4 行动钩子的子检查需要按下方"Twitter archetype 调整"段重新解释。
+⚠️ **Researcher / writer / thinker**：影响力变现型（newsletter / 课程 / 书）。维度 4 的 CTA 改为 "subscribe to newsletter / link to writing"。
+❌ **创作者 / 流量变现 / hobby / 匿名**：和小红书一样不适用。详见 SKILL.md Scope Contract。
+
+---
+
 ## 设计前提
 
 和小红书评分卡共享同一个底层模型：访客是从一条推文 / 转推 / reply 进入主页的，**已经被某条内容 pre-qualified 过**。主页要做的是确认 + 兑现，不是说服。
@@ -85,6 +96,21 @@ percent = weighted_sum / total_weight × 100
 ```
 
 Band 分级与 xiaohongshu.md 共享。
+
+---
+
+## Twitter archetype 调整
+
+维度 1、2、3、5 在所有 archetype 下含义一致。**只有维度 4（行动钩子）需要按 archetype 重新解释**：
+
+| Archetype | 4.1 含义 | 4.2 含义 |
+|-----------|---------|---------|
+| 服务型 OPC | Bio 有联系方式（DM open / email / website） | DM open + 明示触发关键词 = 1 步 |
+| **SaaS / Indie Hacker** | **Bio 有产品 link（不是个人 portfolio link）** | **Pinned tweet 是产品 launch / try-it-now，不是 hello world** |
+| Build-in-public 工程师 | Bio 有 "watch me build at →" 类指示 | Pinned tweet 是项目状态更新或 changelog |
+| Researcher / writer | Bio 有 newsletter / 写作平台 link | Pinned tweet 是订阅引导或代表作 |
+
+报告生成时，必须先确认 archetype（在 SKILL.md Step 1b 已问过），然后用对应的子检查含义评分。**评分卡骨架不变，只换 4.x 的解释字典**——这是 Harness "结构不动、内容多态" 的真实落地。
 
 ---
 

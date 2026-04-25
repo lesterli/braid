@@ -14,6 +14,22 @@ description: >-
 
 A 30-minute diagnostic for personal profiles. Input is a screenshot. Output is a scored audit and an improvement checklist mapped to a platform-specific scorecard.
 
+## Scope Contract
+
+This skill is opinionated about who it serves. It is not a generic profile reviewer.
+
+**✅ Designed for**: 服务型 OPC — anyone whose profile's job is to convert a passing visitor into a paying client (independent designer / consultant / coach / freelancer / indie advisor).
+
+**⚠️ Partial fit, run with awareness**: SaaS / Indie Hacker / build-in-public engineer. The funnel logic still applies, but the "行动钩子" (CTA) dimension means "click product link" or "follow for launch updates" rather than "send DM". On Twitter especially, this is the more common archetype.
+
+**❌ Not designed for**:
+- Pure content creator / 流量变现 profile (goal is `follow`, not contact)
+- Hobby / 兴趣分享 / personal vlog (no conversion funnel exists)
+- Anonymous accounts / 化名 KOL (`身份确认` dimension is structurally inapplicable)
+- Brand / 企业官号 (different model — needs a separate `brand-audit` skill)
+
+If the user's profile falls in ❌, say so plainly and refuse to score. Forcing this scorecard onto a misfit profile produces misleading advice. Telling the user "this skill isn't right for you" is the correct outcome.
+
 ## Inputs
 
 - One or more **screenshots** of the user's profile page (主页). Multiple screenshots are fine if scrolling is needed to see all pinned posts or recent items.
@@ -23,27 +39,41 @@ The skill does not call any external API. All analysis runs on what's visible in
 
 ## Workflow
 
-### Step 1: Identify Platform
+### Step 1: Identify Platform & Verify Scope
 
 This step is mandatory. It must complete before any scoring.
 
-Look at the screenshot(s) and identify the platform from these visual signatures:
+**1a. Platform identification.** Look at the screenshot(s) and identify the platform from these visual signatures:
 
 | Platform | Visual Signatures |
 |----------|------------------|
 | `xiaohongshu` | 红色品牌色 / 小红书 logo, "笔记 · 收藏 · 赞" 标签栏, 方形封面网格, IP 属地标签 |
 | `twitter` | 黑/白 minimal UI, "Posts / Replies / Media / Likes" tabs, 蓝色 verified 勾, 时间线竖排 |
 
-If the platform is not obvious, ask the user explicitly before proceeding:
+If the platform is not obvious, ask the user explicitly: `我看到的像是 [best guess]，可以确认一下吗？`
 
-> 我看到的像是 [best guess]，可以确认一下吗？
+**1b. Scope verification.** Ask the user one question:
 
-Once identified, load the corresponding scorecard:
+> 这个主页的目标是哪种？
+> A) 让访客联系我并付费（服务型 OPC）— 全维度适用
+> B) 让访客试用我的产品 / 关注产品发布（SaaS / build-in-public）— 注意 行动钩子 含义不同
+> C) 让访客关注我看更多内容（创作者 / 流量变现）— 此 skill 不适合
+> D) Hobby / 个人日记 / 不商业化 — 此 skill 不适合
+> E) 匿名账号 / 化名 KOL / 企业官号 — 此 skill 不适合
+
+If the answer is **C / D / E**, refuse to audit and explain plainly:
+
+> 这个 skill 是给"想靠主页拿到付费客户"的服务型 OPC 设计的。你的主页类型不在 scope 内，硬跑这个 scorecard 会给你误导性建议。如果你在做 [类型]，建议自建一份匹配那个漏斗终点的 scorecard。
+
+If the answer is **A**, proceed with full scorecard.
+If **B**, proceed but flag that 维度 4（行动钩子）的子检查需要按"产品试用/follow"语义解释（具体见 [scorecards/twitter.md](./references/scorecards/twitter.md) "Twitter archetype 调整"段）。
+
+**1c. Load scorecard.**
 
 - `xiaohongshu` → [references/scorecards/xiaohongshu.md](./references/scorecards/xiaohongshu.md)
 - `twitter` → [references/scorecards/twitter.md](./references/scorecards/twitter.md)
 
-Never proceed to scoring without an identified platform. Record the identified platform in the final report so the routing decision is auditable.
+Never proceed to scoring without an identified platform AND a scope-verified profile type. Record both in the final report so the routing decision is auditable.
 
 ### Step 2: Extract Profile Snapshot
 
