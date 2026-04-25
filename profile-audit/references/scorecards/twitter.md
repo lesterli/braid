@@ -2,12 +2,14 @@
 
 ## 适用范围
 
-Twitter 上的 OPC 比小红书多样，scope contract 也更细：
+边界是 **operator-side**（1 人 / 小团队 vs 组织化运营），不是 naming-side。完整定义见 SKILL.md 的 Scope Contract。Twitter 上的 archetype 比小红书多样：
 
-✅ **服务型 OPC**：和小红书逻辑一致——独立顾问 / freelancer / 教练 / 设计师，目标是 inbound DM 或 email。所有维度按字面适用。
-✅ **SaaS / Indie Hacker / build-in-public**：**Twitter 上的主流 OPC 类型**。维度 4 行动钩子的子检查需要按下方"Twitter archetype 调整"段重新解释。
-⚠️ **Researcher / writer / thinker**：影响力变现型（newsletter / 课程 / 书）。维度 4 的 CTA 改为 "subscribe to newsletter / link to writing"。
-❌ **创作者 / 流量变现 / hobby / 匿名**：和小红书一样不适用。详见 SKILL.md Scope Contract。
+✅ **A · 服务型 OPC**：独立顾问 / freelancer / 教练 / 设计师。
+✅ **B · SaaS / Indie Hacker / build-in-public**：**Twitter 上的主流 OPC 类型**。
+✅ **B-community · Podcast / newsletter / community 品牌**（Lightcone / Latent Space 形态）。
+✅ **C · Researcher / writer / thinker**：影响力变现（newsletter / 课程 / 书）。
+
+❌ **不适用**：组织化运营企业账号 · 纯流量变现网红 · Hobby
 
 ---
 
@@ -103,12 +105,13 @@ Band 分级与 xiaohongshu.md 共享。
 
 维度 1、2、3、5 在所有 archetype 下含义一致。**只有维度 4（行动钩子）需要按 archetype 重新解释**：
 
-| Archetype | 4.1 含义 | 4.2 含义 |
+| Archetype | 4.1 含义（持续连接渠道） | 4.2 含义（Pinned tweet 用途） |
 |-----------|---------|---------|
-| 服务型 OPC | Bio 有联系方式（DM open / email / website） | DM open + 明示触发关键词 = 1 步 |
-| **SaaS / Indie Hacker** | **Bio 有产品 link（不是个人 portfolio link）** | **Pinned tweet 是产品 launch / try-it-now，不是 hello world** |
-| Build-in-public 工程师 | Bio 有 "watch me build at →" 类指示 | Pinned tweet 是项目状态更新或 changelog |
-| Researcher / writer | Bio 有 newsletter / 写作平台 link | Pinned tweet 是订阅引导或代表作 |
+| **A · 服务型 OPC** | Bio 有联系方式（DM open / email / website） | Pinned 是代表作 / 客户案例 |
+| **B · SaaS / Indie Hacker** | Bio 有产品 link（不是个人 portfolio） | Pinned 是产品 launch / try-it-now |
+| **B · Build-in-public 工程师** | Bio 有 "watch me build at →" 指示 | Pinned 是项目状态更新或 changelog |
+| **B-community · Podcast / newsletter / 社区品牌** | **Bio 有跨平台持续连接渠道（newsletter signup / Discord / 同名其他平台）。注意：这是"主页层面的持续连接"，不是某次具体活动的报名 link——后者属于那条推文的 CTA，不在主页评分范围内** | **Pinned 是常驻型社区/订阅入口，不是单次活动预告** |
+| **C · Researcher / writer** | Bio 有 newsletter / 写作平台 link | Pinned 是订阅引导或代表作 |
 
 报告生成时，必须先确认 archetype（在 SKILL.md Step 1b 已问过），然后用对应的子检查含义评分。**评分卡骨架不变，只换 4.x 的解释字典**——这是 Harness "结构不动、内容多态" 的真实落地。
 

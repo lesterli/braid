@@ -2,9 +2,15 @@
 
 ## 适用范围
 
-✅ **服务型 OPC 主页**：以"通过个人主页拿到付费客户"为目标——独立设计师 / 咨询师 / 教练 / 自由开发者 / 独立顾问。
-⚠️ **SaaS / 产品型主页**：可用此评分卡，但维度 4 行动钩子的语义改为"产品试用 link / follow 产品发布"，不是 DM 路径。
-❌ **创作者 / hobby / 匿名 / 企业官号**：不适用。漏斗终点完全不同，强行评分会误导。详见 SKILL.md 的 Scope Contract。
+边界是 **operator-side**（谁在按键），不是 naming-side（叫什么名字）。完整定义见 SKILL.md 的 Scope Contract。
+
+✅ **1 人 / 小核心团队驱动的 IP**（无论真名还是品牌名）：
+- Archetype A — 服务型 OPC（设计师 / 咨询 / 教练 / 自由开发者）
+- Archetype B — SaaS / Indie Hacker / build-in-public
+- Archetype B-community — Community 品牌 / podcast / newsletter
+- Archetype C — Researcher / writer / thinker
+
+❌ **不适用**：组织化运营的企业账号 · 纯流量变现网红 · Hobby / 不商业化主页
 
 ---
 
@@ -107,6 +113,21 @@
 | **5.1** 主页整体感和最近内容人设一致 | 昵称、bio、置顶、视觉风格 综合传递的人设，与最近 6 条笔记的 tone 大体一致；不会出现"内容很专业但主页气质很娱乐"的割裂 |
 
 **为什么 ×0.5**：兜底维度。前 4 维都做对了，这项基本会自动达成；前 4 维有问题，这项也无力回天。所以低权重，作为整体一致性的尾灯。
+
+---
+
+## Archetype 调整
+
+**维度 1、2、3、5 在所有 archetype 下含义一致。只有维度 4（行动钩子）的子检查需要按 archetype 重新解释**：
+
+| Archetype | 4.1 含义（持续连接渠道） | 4.2 含义（路径长度） |
+|-----------|---------|---------|
+| **A · 服务型 OPC** | Bio 有联系方式（私信触发词 / 微信号 / 邮箱 / 外链） | 直接 DM = 1 步；点 link in bio = 2 步；要求"先关注后私信" = 3 步以上 |
+| **B · SaaS / Indie Hacker** | Bio 有产品 link / try-it-now 路径 | 点链接 → 落地页 ≤ 2 步 |
+| **B-community · Community 品牌 / podcast** | **Bio 有跨平台持续连接渠道（公众号 / 微信群 / Discord / newsletter / 同名其他平台）**。**注意：这是"主页层面的持续连接"，不是某次具体活动的报名 link——后者属于那条具体笔记的 CTA，不在主页评分范围内** | **置顶里有常驻型社区入口**（不是单次活动预告） |
+| **C · Researcher / writer** | Bio 有 newsletter 订阅 / 写作平台 link | 点订阅 ≤ 2 步 |
+
+报告生成时必须先确认 archetype（Step 1b 已问过），然后用对应的子检查含义评分。**评分卡骨架不变，只换 4.x 的解释字典**——结构不动、内容多态。
 
 ---
 

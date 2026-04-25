@@ -18,15 +18,21 @@ A 30-minute diagnostic for personal profiles. Input is a screenshot. Output is a
 
 This skill is opinionated about who it serves. It is not a generic profile reviewer.
 
-**✅ Designed for**: 服务型 OPC — anyone whose profile's job is to convert a passing visitor into a paying client (independent designer / consultant / coach / freelancer / indie advisor).
+The boundary is **operator-side, not naming-side**. Personal IP and brand are not opposites — your name *is* your brand. An account named "OwlLink AI" run by 1 person is in scope (个人 IP using a brand-style name); an account run by a corporate marketing team is not. The real distinction is who's behind the keyboard.
 
-**⚠️ Partial fit, run with awareness**: SaaS / Indie Hacker / build-in-public engineer. The funnel logic still applies, but the "行动钩子" (CTA) dimension means "click product link" or "follow for launch updates" rather than "send DM". On Twitter especially, this is the more common archetype.
+**✅ Designed for**: 1 人 / 小核心团队驱动的 IP，无论命名是真名还是品牌名
+
+- **Archetype A — 服务型 OPC**：designer / consultant / coach / freelancer / indie advisor. 漏斗 = 路过 → 私信 → 付费.
+- **Archetype B — SaaS / Indie Hacker / build-in-public**：indie product / 工具开发者. 漏斗 = 路过 → 试用 → 订阅.
+- **Archetype B-community — Community 品牌 / podcast / newsletter**：1 人 / 小团队运营的社区品牌（如 OwlLink AI、Lightcone、Latent Space 这类形态）. 漏斗 = 路过 → 持续关注 → 加入社区/参加活动.
+- **Archetype C — Researcher / writer / thinker**：newsletter / 课程 / 书 变现.
 
 **❌ Not designed for**:
-- Pure content creator / 流量变现 profile (goal is `follow`, not contact)
-- Hobby / 兴趣分享 / personal vlog (no conversion funnel exists)
-- Anonymous accounts / 化名 KOL (`身份确认` dimension is structurally inapplicable)
-- Brand / 企业官号 (different model — needs a separate `brand-audit` skill)
+- **组织化运营的企业账号**（公司市场部 / 多人轮班 / 公司销售漏斗）— 不同模型，需独立的 `brand-audit` skill
+- 纯流量变现创作者 / 网红（目标是 `follow` + 广告/带货收入，不是转化为服务/产品）
+- Hobby / 兴趣分享 / personal vlog（没有 conversion funnel）
+
+判断准则不是"叫什么名字"，而是"**谁在按键、为什么按键**"。
 
 If the user's profile falls in ❌, say so plainly and refuse to score. Forcing this scorecard onto a misfit profile produces misleading advice. Telling the user "this skill isn't right for you" is the correct outcome.
 
@@ -55,18 +61,20 @@ If the platform is not obvious, ask the user explicitly: `我看到的像是 [be
 **1b. Scope verification.** Ask the user one question:
 
 > 这个主页的目标是哪种？
-> A) 让访客联系我并付费（服务型 OPC）— 全维度适用
-> B) 让访客试用我的产品 / 关注产品发布（SaaS / build-in-public）— 注意 行动钩子 含义不同
-> C) 让访客关注我看更多内容（创作者 / 流量变现）— 此 skill 不适合
-> D) Hobby / 个人日记 / 不商业化 — 此 skill 不适合
-> E) 匿名账号 / 化名 KOL / 企业官号 — 此 skill 不适合
+> A) 让访客联系我并付费（服务型 OPC：设计师 / 咨询 / 教练 / 自由开发者）
+> B) 让访客试用产品 / 关注发布 / 加入社区（SaaS / build-in-public / community 品牌 / podcast / newsletter）
+> C) Researcher / writer / thinker（newsletter / 课程 / 书 变现）
+> D) 纯流量变现 创作者 / 网红 — 此 skill 不适合
+> E) Hobby / 个人日记 / 不商业化 — 此 skill 不适合
+> F) 组织化运营的企业账号（公司市场部 / 多人轮班）— 此 skill 不适合
 
-If the answer is **C / D / E**, refuse to audit and explain plainly:
+If the answer is **D / E / F**, refuse to audit and explain plainly:
 
-> 这个 skill 是给"想靠主页拿到付费客户"的服务型 OPC 设计的。你的主页类型不在 scope 内，硬跑这个 scorecard 会给你误导性建议。如果你在做 [类型]，建议自建一份匹配那个漏斗终点的 scorecard。
+> 这个 skill 是给"1 人 / 小团队驱动 IP 的 OPC"设计的，目标是 conversion（联系/试用/订阅/加入社区）。你的主页类型不在 scope 内，硬跑这个 scorecard 会给你误导性建议。
 
-If the answer is **A**, proceed with full scorecard.
-If **B**, proceed but flag that 维度 4（行动钩子）的子检查需要按"产品试用/follow"语义解释（具体见 [scorecards/twitter.md](./references/scorecards/twitter.md) "Twitter archetype 调整"段）。
+If the answer is **A**, proceed with full scorecard. Apply 维度 4 子检查的服务型语义（联系方式 / 私信路径）.
+If **B**, proceed but apply 维度 4 子检查的 archetype-B 语义。具体语义对照表见 [scorecards/twitter.md](./references/scorecards/twitter.md) 和 [scorecards/xiaohongshu.md](./references/scorecards/xiaohongshu.md) 的 "Archetype 调整" 段。**特别注意**：community 品牌的 4.x 是"跨平台持续连接渠道 / 常驻型社区入口"，**不是某次具体活动的报名 link**——具体活动 CTA 属于那条笔记/推文的范畴，不是主页层面。
+If **C**, proceed with 维度 4 = "newsletter / 写作平台订阅引导"。
 
 **1c. Load scorecard.**
 
@@ -93,11 +101,16 @@ This snapshot is the "before" record. It goes into the final report verbatim.
 
 Read the loaded scorecard. For each dimension:
 
-1. Score 0–10 based on visible evidence in the snapshot.
-2. Cite the specific evidence (e.g., `bio 是 emoji 流水账，没有价值主张`).
-3. If the dimension cannot be evaluated from the provided screenshot (e.g., requires content the user did not include), mark it `N/A` and say what would be needed. Do not guess.
+1. Each sub-check answers `yes` / `no` / `N/A`. Cite the visible evidence inline (e.g., `bio 是 emoji 流水账，没有价值主张`).
+2. Dimension band derives from sub-check pass rate (see scorecard for thresholds).
 
-Aggregate into an overall score using the scorecard's weighting if specified, otherwise a simple average across non-N/A dimensions.
+**N/A 边界规则（must-follow）**：
+
+- 如果某个子检查无法从截图判断（e.g., 截图被裁剪、内容被设置为"仅自己可见"、需要滚动查看的内容缺失），标 `N/A` 并说出需要什么补充截图。**绝不猜测**。
+- **如果一个维度的 N/A 子检查 ≥ 50%**：整个维度标 `⚠️ 不可评估`，不参与加权（从分母中扣除该维度权重），并在报告头部 flag。否则 N/A 子检查仅从该维度的分母中扣除。
+- 真实例外场景：公开内容样本量过低（例如最近笔记 < 3 条且很多都是 private）会让维度 2（持续性信号）几乎全部子检查变 N/A。这种情况下不要给"假高通过率"，按上述规则把维度 2 整个标 ⚠️。
+
+Aggregate into an overall score using the scorecard's weighting. ⚠️ 不可评估的维度从分子和分母同时移除。
 
 ### Step 4: Generate Improvement Report
 
