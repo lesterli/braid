@@ -1,0 +1,6 @@
+interface:
+  display_name: "主页诊断"
+  short_description: "30 分钟诊断你的小红书 / Twitter 主页，给出可执行的改动清单"
+  default_prompt: '上传一张你的主页截图，说"诊断主页"或"audit my profile"，会按 5 维度评分卡产出一份带具体改动建议的报告。'
+policy:
+  allow_implicit_invocation: true
