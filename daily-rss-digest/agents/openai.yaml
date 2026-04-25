@@ -1,6 +1,0 @@
-interface:
-  display_name: "每日摘要"
-  short_description: "在 OpenClaw 中开通原生每日摘要"
-  default_prompt: "在当前 OpenClaw 聊天里，直接说“开通每日摘要”“查看摘要状态”或“关闭每日摘要”；需要显式调用时可使用 $daily-rss-digest。"
-policy:
-  allow_implicit_invocation: true

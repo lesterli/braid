@@ -1,0 +1,6 @@
+interface:
+  display_name: "每日策展"
+  short_description: "每天精选值得阅读的高质量文章"
+  default_prompt: "说“今日推荐”或“今天读什么”获取精选文章列表。也可以说“只看 AI”筛选特定类别，或“本周推荐”获取周度精选。"
+policy:
+  allow_implicit_invocation: true

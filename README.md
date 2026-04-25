@@ -9,7 +9,7 @@ This repository follows the open `SKILL.md` directory format used across agent e
 | Skill | Description |
 |-------|-------------|
 | [article-to-insights](./article-to-insights/) | Turn one article URL into a structured reading result: core summary, relevance analysis, and actionable recommendation. |
-| [daily-rss-digest](./daily-rss-digest/) | Enable an OpenClaw-native daily RSS digest that sends one curated summary per day to the current chat or another configured channel. |
+| [daily-curator](./daily-curator/) | Generate a curated daily reading list of high-quality articles from 18+ trusted sources, with scoring, dedup, and category filtering. |
 
 ## Install
 
@@ -19,7 +19,7 @@ Install directly from GitHub with an explicit skill name:
 
 ```bash
 npx skills add https://github.com/lesterli/braid --skill article-to-insights
-npx skills add https://github.com/lesterli/braid --skill daily-rss-digest
+npx skills add https://github.com/lesterli/braid --skill daily-curator
 ```
 
 Use `--skill <skill-name>` to install exactly the skill you want.
@@ -36,12 +36,12 @@ cd braid
 # Claude Code global skills (~/.claude/skills)
 mkdir -p ~/.claude/skills
 cp -r article-to-insights ~/.claude/skills/
-cp -r daily-rss-digest ~/.claude/skills/
+cp -r daily-curator ~/.claude/skills/
 
 # Codex global skills (${CODEX_HOME:-~/.codex}/skills)
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
 cp -r article-to-insights "${CODEX_HOME:-$HOME/.codex}/skills/"
-cp -r daily-rss-digest "${CODEX_HOME:-$HOME/.codex}/skills/"
+cp -r daily-curator "${CODEX_HOME:-$HOME/.codex}/skills/"
 ```
 
 Restart the agent after installation so new skills are discovered.
