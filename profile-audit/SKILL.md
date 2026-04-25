@@ -72,9 +72,9 @@ If the answer is **D / E / F**, refuse to audit and explain plainly:
 
 > 这个 skill 是给"1 人 / 小团队驱动 IP 的 OPC"设计的，目标是 conversion（联系/试用/订阅/加入社区）。你的主页类型不在 scope 内，硬跑这个 scorecard 会给你误导性建议。
 
-If the answer is **A**, proceed with full scorecard. Apply 维度 4 子检查的服务型语义（联系方式 / 私信路径）.
-If **B**, proceed but apply 维度 4 子检查的 archetype-B 语义。具体语义对照表见 [scorecards/twitter.md](./references/scorecards/twitter.md) 和 [scorecards/xiaohongshu.md](./references/scorecards/xiaohongshu.md) 的 "Archetype 调整" 段。**特别注意**：community 品牌的 4.x 是"跨平台持续连接渠道 / 常驻型社区入口"，**不是某次具体活动的报名 link**——具体活动 CTA 属于那条笔记/推文的范畴，不是主页层面。
-If **C**, proceed with 维度 4 = "newsletter / 写作平台订阅引导"。
+If the answer is **A / B / C**: load the platform scorecard AND [references/archetypes.md](./references/archetypes.md). The scorecard provides 维度 1–5 definitions; archetypes.md provides the 维度 4 子检查 archetype-specific 解释。Apply scoring with both sources.
+
+⚠️ **Subtle but critical边界**：维度 4 评的是**主页层面的持续连接**。具体某次活动 / 产品发布的报名 link 属于那条具体内容的 CTA，不在主页评分范围内。不要把"事件级 CTA"和"主页级 CTA"混淆。详见 archetypes.md 顶部说明。
 
 **1c. Load scorecard.**
 
@@ -142,7 +142,8 @@ Read [references/report-template.md](./references/report-template.md) for the ou
 
 ## References
 
-- [references/scorecards/xiaohongshu.md](./references/scorecards/xiaohongshu.md) — 小红书 评分卡 (12 维度)
-- [references/scorecards/twitter.md](./references/scorecards/twitter.md) — Twitter/X 评分卡 (9 维度)
+- [references/archetypes.md](./references/archetypes.md) — 4 个 archetype 定义 + 维度 4 子检查的 archetype-specific 解释（single source of truth）
+- [references/scorecards/xiaohongshu.md](./references/scorecards/xiaohongshu.md) — 小红书 评分卡（5 维度，post-discovery 漏斗）
+- [references/scorecards/twitter.md](./references/scorecards/twitter.md) — Twitter/X 评分卡（5 维度，结构同小红书）
 - [references/report-template.md](./references/report-template.md) — 输出格式与示例
-- [references/examples/](./references/examples/) — before/after walkthrough (小红书)
+- [references/examples/](./references/examples/) — before/after walkthrough（小红书）

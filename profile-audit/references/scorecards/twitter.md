@@ -68,12 +68,14 @@
 
 ### 维度 4: 行动钩子（权重 ×1.5）
 
-**问题**：访客决定要联系你的时候，能不能在 30 秒内找到下一步？
+**问题**：访客决定采取下一步行动时，能不能在 30 秒内找到路径？
 
 | 子检查 | 通过条件 |
 |-------|---------|
-| **4.1** Bio 里有明确的"如何联系" / website link | 网站 link / DM open / 邮箱 / 任一明示。Twitter 默认 DM 关闭——所以 DM-open 状态本身就是一个被忽视但关键的信号 |
-| **4.2** Pinned tweet 包含 next-step CTA | Pinned tweet 是不是直接邀请行动（"signed up at xx.com" / "DM me if X" / "reading list at yy" 都算） |
+| **4.1** 主页有明确的"持续连接"路径 | Bio / pinned tweet 里有让访客继续跟你的渠道。**具体什么算"持续连接"取决于 archetype**——详见 [archetypes.md 的 4.1 表](../archetypes.md#41-持续连接渠道)。Twitter 特别注意：DM-open 状态是一个被忽视但关键的信号 |
+| **4.2** 该路径在 2 步以内 | 从主页到下一步行动 ≤ 2 次点击 / 操作。**具体的"下一步"形态取决于 archetype**——详见 [archetypes.md 的 4.2 表](../archetypes.md#42-路径长度) |
+
+**重要边界**：这是主页层面的持续连接。某次产品发布 / 活动报名的具体 link 属于那条 tweet 的 CTA，**不在主页评分范围内**。
 
 ---
 
@@ -98,22 +100,6 @@ percent = weighted_sum / total_weight × 100
 ```
 
 Band 分级与 xiaohongshu.md 共享。
-
----
-
-## Twitter archetype 调整
-
-维度 1、2、3、5 在所有 archetype 下含义一致。**只有维度 4（行动钩子）需要按 archetype 重新解释**：
-
-| Archetype | 4.1 含义（持续连接渠道） | 4.2 含义（Pinned tweet 用途） |
-|-----------|---------|---------|
-| **A · 服务型 OPC** | Bio 有联系方式（DM open / email / website） | Pinned 是代表作 / 客户案例 |
-| **B · SaaS / Indie Hacker** | Bio 有产品 link（不是个人 portfolio） | Pinned 是产品 launch / try-it-now |
-| **B · Build-in-public 工程师** | Bio 有 "watch me build at →" 指示 | Pinned 是项目状态更新或 changelog |
-| **B-community · Podcast / newsletter / 社区品牌** | **Bio 有跨平台持续连接渠道（newsletter signup / Discord / 同名其他平台）。注意：这是"主页层面的持续连接"，不是某次具体活动的报名 link——后者属于那条推文的 CTA，不在主页评分范围内** | **Pinned 是常驻型社区/订阅入口，不是单次活动预告** |
-| **C · Researcher / writer** | Bio 有 newsletter / 写作平台 link | Pinned 是订阅引导或代表作 |
-
-报告生成时，必须先确认 archetype（在 SKILL.md Step 1b 已问过），然后用对应的子检查含义评分。**评分卡骨架不变，只换 4.x 的解释字典**——这是 Harness "结构不动、内容多态" 的真实落地。
 
 ---
 
