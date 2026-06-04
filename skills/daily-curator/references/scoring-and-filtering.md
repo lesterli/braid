@@ -1,8 +1,9 @@
 # Scoring, Filtering, and Queue Lifecycle
 
 Two-dimensional scoring + an append-only queue + read-history. The agent **MUST
-compute and display each dimension's score** for transparency — auditable
-selection, self-correcting via taste.md edits.
+compute each dimension's score** for transparent ranking and downstream
+auditing, but scores are hidden from the default user-facing digest. Users can
+ask to show scores when they want to debug or tune `taste.md`.
 
 ## Formula
 
@@ -215,15 +216,18 @@ Same as queued.txt plus two fields:
 (Note: `source_cap_deferred` is a queue insertion reason, not a read reason. It
 appears in `queued.txt` entries, not in `read.txt`.)
 
-## Output: explicit scores per item
+## Output: hidden scores per item
 
-Every item in the digest MUST carry a one-line `_scores:` annotation. See
-[output-format.md](./output-format.md) for the exact rendering. Spillover
-items also carry `queued_since: YYYY-MM-DD`.
+Every item in the digest file MUST carry a one-line hidden `_scores:` metadata
+comment. See [output-format.md](./output-format.md) for the exact rendering.
+Spillover items also carry `queued_since: YYYY-MM-DD`.
 
 Examples:
 
 ```
-_scores: q=1.2 r=0.92 → 1.10 · tracks: [gongzhonghao, deep-read]
-_scores: q=1.2 r=0.85 → 1.02 · queued_since: 2026-05-25 · tracks: [deep-read]
+<!-- _scores: q=1.2 r=0.92 → 1.10 · tracks: [gongzhonghao, deep-read]_ -->
+<!-- _scores: q=1.2 r=0.85 → 1.02 · queued_since: 2026-05-25 · tracks: [deep-read]_ -->
 ```
+
+Only show these scores visibly when the user asks for scoring rationale,
+ranking audit, or `debug_scores=true`.

@@ -28,6 +28,11 @@ how long-form essays don't fall through the cracks).
 
 - `count`: digest size, default **5** (across both sections combined)
 - `queue_ttl_days`: how long unread items linger in `queued.txt`, default **21**
+- `show`: `top` or `all`, default **top**. Use `all` when the user asks
+  "显示全部", "剩下的", "更多", "show all", or a range like "第 6-9 条".
+- `debug_scores`: default **false**. Use `true` only when the user asks why
+  items ranked where they did, asks to audit scoring, or explicitly says
+  "显示分数" / "show scores".
 - `output_language`: user's language, fallback Chinese
 
 (Removed in v2: `mode`, `category`, `ttl_days` — see migration note at bottom.)
@@ -51,6 +56,8 @@ Users manage feeds with conversational commands:
 - "调整口味" / "edit taste" → show `taste.md`, accept edits
 - "已读 <url|title 子串>" → run `scripts/mark-read.sh` (see Step 8)
 - "我的待读" / "queue 状态" → cat queued.txt as a readable summary
+- "更多" / "显示剩余" / "显示全部" / "第 6-9 条" → re-render queued items with
+  clickable titles, continuing from the previous digest order when possible
 
 ## Workflow
 
@@ -145,13 +152,15 @@ Combine new candidates + queue-spillover candidates. Then:
    `hnrss.org/*` count as one source). When cap is hit, the surplus item goes
    to `queued.txt` immediately (if not already there) with
    `reason: source_cap_deferred`.
-3. Take top N (default 5). If both sections together produce fewer than N,
-   the digest is short — never pad. **Items that scored but didn't make top N
+3. Take top N (default 5), unless `show=all`. If both sections together produce
+   fewer than N, the digest is short — never pad. **Items that scored but didn't make top N
    (and weren't cap-deferred) are simply dropped**: they'll be re-scored next
    run if still in the 14d window. They do NOT enter the queue.
 4. Group output into two sub-sections:
    - **新加入**: items from Step 5
    - **从 queue 中精选**: items from Step 6 with `queued_since` shown
+5. When `show=top` and more queued items exist than are displayed, end with a
+   clear next action: "还有 N 篇在待读队列；说 `更多` / `显示全部` 查看。"
 
 ### Step 8: Persist
 
@@ -167,12 +176,18 @@ Combine new candidates + queue-spillover candidates. Then:
 
 ### Step 9: Respond
 
-Print the digest content to the chat (byte-identical to the file). At the end,
-report GC effects from Steps 1 & 6:
+Print the readable digest content to the chat. At the end, report GC effects
+from Steps 1 & 6:
 
 ```
 queue: +3 new · -2 ttl_gc · -1 taste_gc · 14 in queue
 ```
+
+If `debug_scores=false`, do not display score details in the visible chat
+output. Keep score metadata in the digest file using hidden HTML comments as
+specified in [references/output-format.md](./references/output-format.md). If
+`debug_scores=true`, add a compact "评分明细" section after the digest instead
+of cluttering each item.
 
 ## Mark-as-read flow (separate invocation)
 
@@ -189,8 +204,19 @@ When the user says "已读 <url>" or "已读 <title 子串>":
 - Prefer depth over breadth — one great article beats three mediocre ones.
 - Keep summaries grounded in actual content, not hallucinated.
 - If a feed is unreachable, skip it silently (don't error the whole run).
-- **Always show the `_scores:` annotation** — it lets the user audit and
-  correct the agent's taste judgment via taste.md edits.
+- The article title is the primary action. Always render it as a Markdown link:
+  `**1. [Title](https://...)**`. Never output a bare, unclickable title when a
+  URL is available.
+- Do not prefix recommendations with boilerplate labels such as
+  "一句话策展人点评：". The line after `Source:` should be the recommendation
+  itself.
+- Avoid generic repeated recommendations. Each item must name the article's
+  specific object, claim, method, artifact, or tension. If the RSS summary is
+  too thin to support that, say what is actually known instead of filling with
+  a template.
+- **Compute every score, but hide score metadata by default** — it lets
+  downstream tools audit the run without forcing users to read machine details.
+  Only show visible score details when `debug_scores=true`.
 - **Always write the digest file**, even on empty days. The empty file is a
   signal that the day was processed.
 
@@ -212,12 +238,13 @@ When the user says "已读 <url>" or "已读 <title 子串>":
 
 1. YAML frontmatter (`date`, `sources_fetched_today`, `new_count`,
    `queue_filler_count`, `queue_size`, `theme_keywords`, `queue_ttl_days`)
-2. Per-item lines with their `_scores: q=... r=... → total · tracks: [...]`
-   annotation (plus `queued_since: YYYY-MM-DD` for spillover items)
+2. Per-item hidden metadata comments with `_scores: q=... r=... → total ·
+   tracks: [...]` (plus `queued_since: YYYY-MM-DD` for spillover items)
 3. Filters by `tracks` to decide which items go to which output channel
 
-Stability of the frontmatter field names and the `_scores:` annotation regex
-is part of this contract.
+Stability of the frontmatter field names and hidden `_scores:` metadata regex
+is part of this contract. The score metadata is machine-readable, not part of
+the default visible UX.
 
 ## Migration from v1 (2026-05)
 
