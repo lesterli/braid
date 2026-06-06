@@ -11,6 +11,7 @@ This repository follows the open `SKILL.md` directory format used across agent e
 | [article-to-insights](./skills/article-to-insights/) | Turn one article URL into a structured reading result: core summary, relevance analysis, and actionable recommendation. |
 | [daily-curator](./skills/daily-curator/) | Generate a curated daily reading list of high-quality articles from trusted sources, with scoring, dedup, and a persistent reading queue. |
 | [profile-audit](./skills/profile-audit/) | Diagnose a 小红书 / Twitter profile from a screenshot. Scoped to service-providing OPC (designer / consultant / coach / freelancer / SaaS founder). Scores 5 funnel-aligned dimensions with binary sub-checks, returns a band score and concrete improvement edits. |
+| [homework-coach](./skills/homework-coach/) | Socratic math homework coach that refuses to give the answer — withholds the solution and reverse-questions one step at a time. Math truth comes from a pinned deterministic verifier (sympy), never the model, so it can't get grounded arithmetic/algebra wrong. Figure-free arithmetic / fractions / one-variable equations; degrades cleanly on geometry/proofs. |
 
 ## Install
 
@@ -28,6 +29,7 @@ Install directly from GitHub with an explicit skill name:
 npx skills@latest add lesterli/braid --skill article-to-insights
 npx skills@latest add lesterli/braid --skill daily-curator
 npx skills@latest add lesterli/braid --skill profile-audit
+npx skills@latest add lesterli/braid --skill homework-coach
 ```
 
 Use `--skill <skill-name>` to install exactly the skill you want.
@@ -68,12 +70,14 @@ mkdir -p ~/.claude/skills
 cp -r skills/article-to-insights ~/.claude/skills/
 cp -r skills/daily-curator ~/.claude/skills/
 cp -r skills/profile-audit ~/.claude/skills/
+cp -r skills/homework-coach ~/.claude/skills/
 
 # Codex global skills (${CODEX_HOME:-~/.codex}/skills)
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
 cp -r skills/article-to-insights "${CODEX_HOME:-$HOME/.codex}/skills/"
 cp -r skills/daily-curator "${CODEX_HOME:-$HOME/.codex}/skills/"
 cp -r skills/profile-audit "${CODEX_HOME:-$HOME/.codex}/skills/"
+cp -r skills/homework-coach "${CODEX_HOME:-$HOME/.codex}/skills/"
 ```
 
 Restart the agent after installation so new skills are discovered.
