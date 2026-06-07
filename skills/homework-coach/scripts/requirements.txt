@@ -1,4 +1,0 @@
-# Runtime dependency for verifier.py. Must be available in the host's
-# code-execution environment (e.g. Hermes execute_code) so the engine can
-# call the verifier. Dev adds pytest (see TDD setup).
-sympy>=1.14

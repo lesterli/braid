@@ -1,6 +1,0 @@
-interface:
-  display_name: "作业教练"
-  short_description: "拒绝直接给答案的苏格拉底式作业辅导,逼孩子自己想出来"
-  default_prompt: "发一道作业题(粘贴/拍照),我不会告诉你答案,而是一步步反问,帮你自己做出来。当前支持:算术、分数、一元一次方程。"
-policy:
-  allow_implicit_invocation: true
