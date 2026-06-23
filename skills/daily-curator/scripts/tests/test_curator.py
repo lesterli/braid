@@ -24,6 +24,7 @@ sys.path.insert(0, SCRIPTS)
 import canon          # noqa: E402
 import curate         # noqa: E402
 import migrate        # noqa: E402
+import health         # noqa: E402
 
 # verify-run.py has a hyphen; load it by path.
 import importlib.util  # noqa: E402
@@ -201,6 +202,74 @@ class TestVerify(unittest.TestCase):
         self.assertTrue(any("_scores" in x for x in
                             verify_run.check_digest_body("# T\n<!-- _scores: q=1 -->")))
         self.assertEqual(verify_run.check_digest_body("# 今日推荐\n\nbody"), [])
+
+
+class TestHealth(unittest.TestCase):
+    def test_record_run(self):
+        with tempfile.TemporaryDirectory() as home:
+            health.record_run(home, {"a": "ok", "b": "unreachable"}, TODAY)
+            data = health.load_health(home)
+            self.assertEqual(data["feeds"]["a"]["last_ok"], TODAY.isoformat())
+            self.assertEqual(data["feeds"]["a"]["last_status"], "ok")
+            self.assertNotIn("last_ok", data["feeds"]["b"], "unreachable feed gets no last_ok")
+
+    def test_stale_detection(self):
+        data = {"feeds": {
+            "fresh": {"last_ok": "2026-06-23"},          # ok today
+            "dead": {"last_ok": "2026-06-01"},           # 22d ago > 14
+            "never": {"first_seen": "2026-06-01"},       # never ok, 22d old
+            "newish": {"first_seen": "2026-06-20"},      # never ok but only 3d old
+        }}
+        stale = set(health.stale_feeds(data, TODAY, threshold_days=14))
+        self.assertEqual(stale, {"dead", "never"})
+
+    def test_backlog_feed_never_stale(self):
+        # A monthly publisher: its feed returns backlog every day, so it is "ok"
+        # every run and never goes stale despite not publishing in weeks.
+        data = {"feeds": {"monthly": {"last_ok": TODAY.isoformat()}}}
+        self.assertEqual(health.stale_feeds(data, TODAY, 14), [])
+
+    def test_alert_rate_limit(self):
+        data = {"feeds": {
+            "x": {"last_ok": "2026-06-01"},                                  # never alerted
+            "y": {"last_ok": "2026-06-01", "last_alert": "2026-06-21"},      # 2d ago
+            "z": {"last_ok": "2026-06-01", "last_alert": "2026-06-10"},      # 13d ago
+        }}
+        stale = health.stale_feeds(data, TODAY, 14)
+        due = set(health.due_for_alert(data, stale, TODAY, cadence_days=7))
+        self.assertEqual(due, {"x", "z"}, "y was alerted within cadence, not due")
+
+
+class TestRoundup(unittest.TestCase):
+    DIGEST = ("# 今日推荐 | 2026-06-22\n\n"
+              "**1. [First Post](https://ex.com/a/#frag)**\n"
+              "Source: Simon Willison · 1d ago\n"
+              "Why the first one matters.\n\n"
+              "**2. [Second Post](https://ex.com/b)**\n"
+              "Source: Latent Space · 3d ago\n"
+              "Why the second one matters.\n")
+
+    def test_parse_digest_items(self):
+        items = curate.parse_digest_items(self.DIGEST)
+        self.assertEqual(len(items), 2)
+        self.assertEqual(items[0]["url"], "https://ex.com/a", "fragment stripped")
+        self.assertEqual(items[0]["title"], "First Post")
+        self.assertEqual(items[0]["source"], "Simon Willison · 1d ago")
+        self.assertEqual(items[0]["why"], "Why the first one matters.")
+
+    def test_collect_week_dedup(self):
+        with tempfile.TemporaryDirectory() as home:
+            dd = os.path.join(home, "digests")
+            os.makedirs(dd)
+            with open(os.path.join(dd, "2026-06-23.md"), "w") as fh:
+                fh.write("# 今日推荐 | 2026-06-23\n\n"
+                         "**1. [Today](https://ex.com/today)**\nSource: X · 0d ago\nwhy\n")
+            with open(os.path.join(dd, "2026-06-22.md"), "w") as fh:
+                fh.write(self.DIGEST)
+            items = curate.collect_week(home, 7, TODAY)
+            urls = [it["url"] for it in items]
+            self.assertEqual(urls, ["https://ex.com/today", "https://ex.com/a", "https://ex.com/b"])
+            self.assertEqual(items[0]["date"], "2026-06-23", "most recent first")
 
 
 _DIGEST_HANDLES = []

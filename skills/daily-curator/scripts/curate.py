@@ -53,6 +53,8 @@ from canon import (  # noqa: E402
     canonicalize_url, parse_date, today_utc,
     load_seen_urls, prune_seen, append_seen,
 )
+import health  # noqa: E402
+from datetime import timedelta  # noqa: E402
 
 FRESHNESS_WINDOW_DAYS = 14
 DEFAULT_COUNT = 5
@@ -261,6 +263,61 @@ def select(scored: list[dict], count: int = DEFAULT_COUNT,
 
 
 # ---------------------------------------------------------------------------
+# Weekly roundup (parse prior digests; pure)
+# ---------------------------------------------------------------------------
+_TITLE_RE = re.compile(r"^\*\*\d+\.\s*\[(?P<title>.+?)\]\((?P<url>\S+?)\)\*\*\s*$")
+
+
+def parse_digest_items(text: str) -> list[dict]:
+    """Extract items from a rendered v3 digest. Each item is a title line
+    `**N. [title](url)**`, then a `Source:` line, then the why-line."""
+    lines = text.splitlines()
+    items: list[dict] = []
+    i = 0
+    while i < len(lines):
+        m = _TITLE_RE.match(lines[i].strip())
+        if not m:
+            i += 1
+            continue
+        item = {"title": m.group("title"), "url": canonicalize_url(m.group("url")),
+                "source": "", "why": ""}
+        # next non-empty line: Source; the one after: why
+        j = i + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        if j < len(lines) and lines[j].strip().lower().startswith("source:"):
+            item["source"] = lines[j].split(":", 1)[1].strip()
+            k = j + 1
+            while k < len(lines) and not lines[k].strip():
+                k += 1
+            if k < len(lines) and not _TITLE_RE.match(lines[k].strip()) \
+                    and not lines[k].startswith("#"):
+                item["why"] = lines[k].strip()
+        items.append(item)
+        i += 1
+    return items
+
+
+def collect_week(home: str, days: int, today: date) -> list[dict]:
+    """Items from the last `days` daily digests (most recent first), deduped."""
+    digests_dir = os.path.join(home, "digests")
+    seen: set[str] = set()
+    out: list[dict] = []
+    for back in range(days):
+        d = (today - timedelta(days=back)).isoformat()
+        path = os.path.join(digests_dir, f"{d}.md")
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as fh:
+            for it in parse_digest_items(fh.read()):
+                if it["url"] and it["url"] not in seen:
+                    seen.add(it["url"])
+                    it["date"] = d
+                    out.append(it)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Paths + tmp hygiene
 # ---------------------------------------------------------------------------
 def state_home(arg_home: str | None) -> str:
@@ -312,14 +369,24 @@ def cmd_prepare(args) -> int:
     patterns = load_negative_patterns(home)
     all_entries: list[dict] = []
     fetched_blobs: list[str] = []
+    statuses: dict[str, str] = {}
     ok_feeds = 0
     for url in feeds:
         body = fetch_feed(url)
-        if not body:
+        if body is None:
+            statuses[url] = "unreachable"
             continue
-        ok_feeds += 1
         fetched_blobs.append(f"<!-- {url} -->\n{body}")
-        all_entries.extend(parse_feed(body, url))
+        entries = parse_feed(body, url)
+        if entries:
+            statuses[url] = "ok"
+            ok_feeds += 1
+            all_entries.extend(entries)
+        else:
+            statuses[url] = "empty"
+    # Record per-feed health (a working feed always returns its backlog, so this
+    # is cadence-independent — see health.py). Alerting is a separate step.
+    health.record_run(home, statuses, today)
 
     candidates = filter_candidates(all_entries, seen_urls, today, patterns, args.window)
 
@@ -374,6 +441,19 @@ def cmd_mark_seen(args) -> int:
     return 0
 
 
+def cmd_roundup(args) -> int:
+    home = state_home(args.home)
+    today = today_utc()
+    items = collect_week(home, args.days, today)
+    out = {"generated_at": today.isoformat(), "days": args.days,
+           "count": len(items), "items": items}
+    json.dump(out, sys.stdout, ensure_ascii=False, indent=2)
+    print()
+    print(f"[roundup] {len(items)} item(s) from the last {args.days} day(s) of digests",
+          file=sys.stderr)
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="daily-curator v3 deterministic pipeline")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -396,6 +476,11 @@ def main(argv=None) -> int:
     pm.add_argument("--selected", required=True)
     pm.add_argument("--home")
     pm.set_defaults(func=cmd_mark_seen)
+
+    pr = sub.add_parser("roundup", help="collect items from the last N daily digests")
+    pr.add_argument("--days", type=int, default=7)
+    pr.add_argument("--home")
+    pr.set_defaults(func=cmd_roundup)
 
     args = p.parse_args(argv)
     return args.func(args)

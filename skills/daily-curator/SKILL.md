@@ -121,13 +121,10 @@ bucket), and takes the top `count`. Writes `tmp/selected.json`. Items below the
 floor or beyond the cap are simply not selected — they are NOT recorded, so they
 re-compete next run.
 
-### Step 5: Deliver or stay silent
-If `selected` is empty → respond exactly `[SILENT]` and stop (nothing fresh
-cleared the bar; do not pad, do not recycle).
-
-Otherwise write `~/.daily-curator/digests/<today>.md` as clean human Markdown,
-starting at an H1, **no YAML frontmatter and no hidden score comments** (the v2
-machine layer is gone). One item per pick:
+### Step 5: Write the digest (only if there is content)
+If `selected` is non-empty, write `~/.daily-curator/digests/<today>.md` as clean
+human Markdown, starting at an H1, **no YAML frontmatter and no hidden score
+comments** (the v2 machine layer is gone). One item per pick:
 ```
 **1. [Title](https://canonical-url)**
 Source: <Source> · <Nd ago>
@@ -140,30 +137,42 @@ python3 scripts/curate.py mark-seen --selected tmp/selected.json   # skip if dry
 python3 scripts/verify-run.py --selected tmp/selected.json \
     --digest ~/.daily-curator/digests/<today>.md \
     --seen ~/.daily-curator/seen.txt --snapshot tmp/seen-snapshot.json
+python3 scripts/health.py check   # prints a stale-feed alert (or nothing) — see Step 7
 ```
 If `verify-run.py` exits non-zero, do NOT deliver — report the failure instead.
 In `dry_run`, write the digest under `tmp/` only, skip `mark-seen`, and log the
 brief that *would* have been pushed.
 
-### Step 7: Respond
-The final reply is the digest body, from the H1 down. Nothing else. (Cron
-delivers this to Feishu; do not call send_message.)
+### Step 7: Deliver (a feed alert can override silence)
+Decide the final reply by precedence:
+- **Content day** (`selected` non-empty): reply with the digest body from the H1
+  down. If `health.py check` printed an alert, append it as a short trailer.
+- **Silent day + feed alert**: reply with the health alert text — NOT `[SILENT]`
+  — so a broken feed surfaces even when there is nothing to recommend.
+- **Silent day, no alert**: reply with exactly `[SILENT]`.
+
+Never call send_message; cron delivers the reply to Feishu. In `dry_run`, deliver
+nothing — just log what would have been sent.
 
 ## Workflow (weekly roundup — `mode=weekly`, Sundays)
 The weekly run is the **heartbeat**: it always delivers, so the channel never
-goes dark for a week and a 7-day silence means something is broken. Read the
-last 7 days of `digests/*.md`, pick the 3–5 strongest items of the week, and
-write a short "本周精选" brief. No new scoring is needed — reuse what was already
-selected. If the week was genuinely empty, send a one-line "本周无新增" note
-rather than `[SILENT]`.
+goes dark for a week (and a 7-day silence then means something is broken).
+```bash
+python3 scripts/curate.py roundup --days 7   # items from the last 7 daily digests
+```
+Pick the 3–5 strongest items from that set — no new scoring, reuse what was
+already chosen this week — and write a short "本周精选" brief in the weekly format
+(see [references/output-format.md](./references/output-format.md)). If the week
+produced nothing, send a one-line "本周无新增。" rather than `[SILENT]`.
 
 ## Feed health
-`curate.py prepare` reports `feeds_ok / feeds_total` each run. A persistent drop
-(a feed returning nothing for far longer than its normal cadence) means a feed —
-including the third-party Anthropic Engineering feed — has broken. A dedicated
-out-of-band stale-feed alert (delivered even on silent days, with a
-cadence-aware threshold so monthly publishers don't false-alarm) is a planned
-follow-up; until then, eyeball `feeds_ok` during the dry-run period.
+`curate.py prepare` records each feed's fetch outcome to `feed-health.json`.
+`scripts/health.py check` flags any feed that has returned no parseable entry for
+> 14 days and emits an out-of-band alert (delivered even on silent days — see
+Step 7), rate-limited to once a week per feed. This is cadence-aware *without*
+modeling cadence: a healthy feed always serves its backlog, so a monthly
+publisher stays "ok" every day and never false-alarms; only a genuinely broken
+feed — including the third-party Anthropic Engineering scraper — trends stale.
 
 ## Working Rules
 - Never pad to meet `count`. A short brief, or `[SILENT]`, is honest.
@@ -177,7 +186,8 @@ follow-up; until then, eyeball `feeds_ok` during the dry-run period.
 - Run the scripts; do not re-implement their logic inline.
 
 ## References
-- [scripts/curate.py](./scripts/curate.py) — prepare / select / mark-seen
+- [scripts/curate.py](./scripts/curate.py) — prepare / select / mark-seen / roundup
+- [scripts/health.py](./scripts/health.py) — feed-health tracking + stale-feed alert
 - [scripts/migrate.py](./scripts/migrate.py) — one-shot v2→v3 state migration
 - [scripts/verify-run.py](./scripts/verify-run.py) — pre-delivery invariant check
 - [scripts/canon.py](./scripts/canon.py) — shared URL canonicalization + seen.txt ledger
