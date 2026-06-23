@@ -1,233 +1,85 @@
-# Scoring, Filtering, and Queue Lifecycle
+# Scoring & Filtering (v3)
 
-Two-dimensional scoring + an append-only queue + read-history. The agent **MUST
-compute each dimension's score** for transparent ranking and downstream
-auditing, but scores are hidden from the default user-facing digest. Users can
-ask to show scores when they want to debug or tune `taste.md`.
-
-## Formula
-
-```
-total = relevance_to_user_taste × source_quality
-```
-
-Range: 0.0 to 1.2 (max: 1.0 × 1.2). Why these two, and not the old `t × q × (1+d)
-× r`: source-quality already encodes "this author writes deep content reliably",
-so a separate `d` was double-counting. And the seen-cache (now queued+read)
-already answers "have I seen this yet?", so multiplying by timeliness was
-double-counting that too. The new pipeline keeps timeliness as a filter and
-tiebreaker, not a dimension.
+One relevance score per item, a cheap pre-filter before any LLM work, and a low
+floor that doubles as the silence gate. No persisted scores, no queue, no `q × r`.
 
 ## Pipeline
 
 ```
-fetch → Stage 1 cheap pre-filter → drop in-queue + in-read → score new
-                                                                    │
-                                                                    ▼
-queue → re-score r → taste_gc (r<0.3) → spillover candidates ───► merge
-                                                                    │
-                                                                    ▼
-                                                       same-source cap=2
-                                                                    │
-                                                                    ▼
-                                                       Top N (default 5)
-                                                                    │
-                                                                    ▼
-                                            persist: queued.txt + digest.md
+fetch ─▶ canonicalize ─▶ cheap filters (NO LLM) ─▶ LLM relevance 0–1 ─▶ floor ─▶ rank ─▶ cap ─▶ top-N
+                              │                                            │
+                  freshness + dedup + neg-anchor                    [SILENT] if empty
 ```
 
-## Hard drops
+The cheap filters and the floor/rank/cap/top-N are done by `scripts/curate.py`
+(`prepare` and `select`). Only the 0–1 relevance score in the middle is yours.
 
-An item is dropped **immediately, no exceptions**, if any of:
+## Cheap filters (curate.py prepare — no tokens)
 
-1. `published > 14 days ago` (window — fresh-enough constraint, see "Freshness")
-2. Title matches a Stage 1 literal negative-anchor (cheap)
-3. URL already in `queued.txt` (it'll appear via spillover, not as new)
-4. URL already in `read.txt` (don't resurface)
+Applied in order; survivors become the candidate set:
 
-URLs in (3) and (4) are compared in **canonical form** (`#fragment` stripped).
-RSS feeds emit inconsistent variants of the same article URL; without
-canonicalization, dedup leaks. See SKILL.md Step 4 for details.
+1. **Freshness**: drop items published > 14 days ago. No-date items are kept.
+2. **Dedup**: drop URLs already in `seen.txt` (compared in canonical form —
+   `#fragment` stripped, trailing slash normalized; see `canon.py`).
+3. **Negative-anchor pre-filter**: drop titles matching literal patterns
+   (`融资|IPO|估值|裁员|…`). Keep here ONLY patterns safe to drop without context.
+   Override the built-in list with `~/.daily-curator/negative-anchors.txt`
+   (one regex per line) if needed.
 
-5. `relevance_to_user_taste < 0.3` (off-topic for this user)
-6. `total < 0.4` (overall quality bar)
+## Relevance score (your judgment, 0–1)
 
-## Stage 1 — Cheap pre-filter (no LLM tokens)
+Read `taste.md`. Score each candidate for relevance to the user's taste by
+**relative ranking anchored to examples**, not an absolute guess (an unanchored
+absolute score is what collapsed v2 to a constant):
 
-Right after parsing feed entries, scan every candidate's **title** against
-literal patterns extracted from `~/.daily-curator/taste.md`'s "Negative
-anchors" section. Drop hits unconditionally.
-
-```bash
-# Default literal set — keep in sync with taste.md negative anchors.
-# Case-insensitive; matched against title only.
-patterns='融资|IPO|估值|震惊|取代|要失业|10\s*个\s*prompt|10 Prompts?|股价|裁员|涨停|跌停'
-grep -iEv "$patterns" candidates.tsv > survivors.tsv
-```
-
-Tuning rule: only put patterns here that are **safe to drop without context**.
-"融资" is safe. "AI" is not (too broad). When in doubt, leave it for the
-semantic stage.
-
-## Stage 2 — Semantic scoring
-
-Apply `q × r` to survivors. Two dimensions:
-
-### Relevance to User Taste (0–1)
-
-Read `~/.daily-curator/taste.md`. The file declares:
-- Primary / Secondary / Tertiary topic axes
-- Positive anchors (voices/sources the user wants more of)
-- Negative anchors (patterns to never recommend)
-
-Rubric:
+1. Anchor first. Pick 2–3 reference points from `taste.md`:
+   primary-axis + positive-anchor ≈ **0.9**, borderline tertiary ≈ **0.5**,
+   negative-anchor ≈ **0.1**. Score everything relative to those.
+2. Rank candidates against each other; do not bunch them at one value.
+3. **Negative-anchor short-circuit**: anything mainly about funding/valuation,
+   launch hype with no implementation detail, leaderboard drama, prompt-list
+   content, or policy/geopolitics without a concrete engineering artifact →
+   collapse to ≈ 0, even from a high-quality source.
+4. **Thin-roundup caution**: newsletter roundups and `[AINews]`-style items
+   often mention "agent/model/benchmark" while being thin summaries. Score them
+   low unless the title/summary exposes a concrete eval, API/tooling change, or
+   implementation note.
 
 | Range | Meaning |
 |---|---|
-| 0.9 – 1.0 | matches primary axis + positive-anchor content |
-| 0.7 – 0.89 | matches primary OR secondary, no anchor overlap |
-| 0.5 – 0.69 | matches tertiary axis, or peripheral but interesting |
-| 0.3 – 0.49 | borderline; topic-adjacent but soft fit — usually drop |
-| 0.0 – 0.29 | misfit; especially if any negative-anchor pattern present |
+| 0.9–1.0 | primary axis + positive anchor, or a first-hand artifact |
+| 0.7–0.89 | primary or strong secondary, concrete implementation detail |
+| 0.5–0.69 | interesting but indirect; useful background |
+| 0.3–0.49 | adjacent, soft fit; usually below the floor |
+| 0.0–0.29 | misfit, hype, thin summary, or negative-anchor match |
 
-**Negative-anchor short-circuit**: items that slipped past Stage 1 but still
-match a semantic negative anchor → set `relevance = 0.0`.
+## Floor, rank, cap (curate.py select)
 
-### Source Quality (multiplier)
+- **Floor (default 0.4)** — drop everything below it. If nothing clears the
+  floor, the result is empty → the run is `[SILENT]`. The floor is the one tuning
+  knob; calibrate it from the dry-run score distribution rather than guessing.
+- **Rank** — score descending, tie-broken by newer `published`. Source quality is
+  reflected in the LLM relevance score (via taste.md's positive anchors), **not**
+  as a separate mechanical multiplier or tiebreaker — the only deterministic
+  tiebreaker is recency.
+- **Same-source cap = 2** per source bucket. All `hnrss.org/*` share one
+  "hackernews" bucket so HN can't dominate; every other feed is its own bucket.
+- **Top-N** — take `count` (default 5, cap 7).
 
-| Tier | Multiplier | Criteria |
-|------|------------|----------|
-| Tier 1 | 1.2× | Listed in curated-feeds.md AI/Engineering — author reliably produces depth content |
-| Tier 2 | 1.0× | Listed in curated-feeds.md Open Source & Industry |
-| User-added | 0.9× | In feeds.txt but not in curated-feeds.md — unknown track record |
+## Freshness is a filter + tiebreaker, not a dimension
 
-Source quality is the **only** depth proxy. RSS summary length is too noisy
-(minimaxir gives 8 chars, Simon Willison gives full content; both write deep
-posts) to support a separate depth adjustment.
+The user's taste leans toward essays that don't decay, and `seen.txt` already
+answers "have I shown this?". So freshness only (a) hard-filters items older than
+14 days and (b) breaks score ties. It does not bias ranking toward recency, so
+slow monthly/quarterly sources are not disadvantaged once they publish.
 
-## Freshness — filter + tiebreaker
+## Overflow & state
 
-Freshness is **not** a scoring dimension. It is two things:
-
-- **Hard filter**: items published > 14 days ago are dropped. Anything still
-  "fresh to you" beyond that window belongs in your own bookmark system.
-- **Tiebreaker**: when two items share the same `total` (within ±0.01),
-  prefer the newer one.
-
-Rationale: the user's taste profile leans heavily toward essays and analyses
-that don't decay. The queue+read state already answers "have I seen this?".
-
-## Queue re-scoring (Step 6 in SKILL.md)
-
-For each item in `queued.txt`, **on every run**:
-
-1. Re-compute `r` using today's `taste.md`. (`q` is stored in the queue entry
-   and never re-computed — it only changes if curated-feeds.md changes, which
-   is rare and explicit.)
-2. If `r < 0.3`: silently move the item to `read.txt` with
-   `reason: taste_gc`. The agent reports the count to the user but doesn't
-   list each item.
-3. Otherwise, the item is eligible for spillover with today's
-   `total = q × r_new`.
-
-This makes the queue **live** — when the user edits taste.md, the queue
-self-prunes within one run.
-
-## Same-source cap (Step 7)
-
-After merging new candidates + spillover candidates and sorting by total:
-
-- **Cap = 2 per source per digest.**
-- HN feeds are aggregated: all `hnrss.org/*` URLs share one source bucket.
-  Other sources are their own bucket (one feed = one bucket).
-- When the cap is hit, the surplus item is **deferred to the queue**:
-  - If it was a new candidate: insert into `queued.txt` with
-    `reason: source_cap_deferred` so it can spillover tomorrow.
-  - If it was already in the queue (spillover candidate): leave it; it'll
-    re-appear tomorrow when the cap might not bind.
-
-The cap applies to the **final digest** (new + spillover combined), not to
-each section individually.
-
-## Empty Day
-
-If, after all filters and cap, fewer items remain than `count`, just produce
-a shorter digest. **Never pad**.
-
-If zero items qualify:
-
-```markdown
-# 今日推荐 · 待读队列 | YYYY-MM-DD
-
-今日无新增；queue 中也无可推内容（全部 <0.3 或已被 cap 限制）。
-明天见。
-```
-
-The empty digest is still written to disk so downstream skills get a clear
-signal.
-
-## State files
-
-```
-~/.daily-curator/
-├── queued.txt   JSONL — items shown in some past digest but not read
-├── read.txt     JSONL — items processed out of queue
-└── digests/YYYY-MM-DD.md
-```
-
-### `queued.txt` entry format
-
-```json
-{
-  "url": "https://example.com/post",
-  "queued_since": "2026-05-28",
-  "title": "...",
-  "source": "Hillel Wayne",
-  "source_quality": 1.2,
-  "tracks": ["gongzhonghao", "deep-read"],
-  "summary_snippet": "First 300-500 chars of the RSS summary, used for queue re-scoring."
-}
-```
-
-`summary_snippet` is stored so r-rescoring doesn't require re-fetching the
-original URL — the source might have rolled off the RSS feed by then.
-
-### `read.txt` entry format
-
-Same as queued.txt plus two fields:
-
-```json
-{
-  "...all queued.txt fields...",
-  "read_at": "2026-05-28",
-  "reason": "explicit | ttl_gc | taste_gc | source_cap_deferred | legacy_migration"
-}
-```
-
-`reason` values:
-
-| Reason | Trigger |
-|---|---|
-| `explicit` | User ran `bash scripts/mark-read.sh URL...` or said "已读 ..." |
-| `ttl_gc` | `queued_since` is older than `queue_ttl_days` (default 21) |
-| `taste_gc` | Re-scored `r < 0.3` after the user edited taste.md |
-| `legacy_migration` | One-shot import from v1 `seen.txt` |
-
-(Note: `source_cap_deferred` is a queue insertion reason, not a read reason. It
-appears in `queued.txt` entries, not in `read.txt`.)
-
-## Output: hidden scores per item
-
-Every item in the digest file MUST carry a one-line hidden `_scores:` metadata
-comment. See [output-format.md](./output-format.md) for the exact rendering.
-Spillover items also carry `queued_since: YYYY-MM-DD`.
-
-Examples:
-
-```
-<!-- _scores: q=1.2 r=0.92 → 1.10 · tracks: [gongzhonghao, deep-read]_ -->
-<!-- _scores: q=1.2 r=0.85 → 1.02 · queued_since: 2026-05-25 · tracks: [deep-read]_ -->
-```
-
-Only show these scores visibly when the user asks for scoring rationale,
-ranking audit, or `debug_scores=true`.
+- Items below the floor or beyond the cap are **not** recorded in `seen.txt`, so
+  they re-compete next run while still inside the 14-day window. This rollover is
+  best-effort: an item that rolls off its RSS feed before being shown is gone
+  (fine — this is a brief, not a never-miss archive).
+- Only **shown** items are appended to `seen.txt`. It is pruned to a 30-day
+  rolling window each run (an item older than the freshness window can never
+  resurface, so older rows are dead weight).
+- No scores are persisted. Nothing downstream consumes them.

@@ -2,7 +2,7 @@
 
 Starter template and quality tier reference. When a user first says "今日推荐" and has no `~/.daily-curator/feeds.txt` yet, these feeds are used as the default source list.
 
-This file also serves as the **tier classification reference** — feeds listed here under Tier 1 categories get the 1.2× quality multiplier even when loaded from `feeds.txt`.
+In v3 source quality is reflected in the LLM relevance score (via taste.md's positive anchors), **not** as a mechanical multiplier or tiebreaker — the deterministic ranking tiebreaker is recency (see scoring-and-filtering.md). This file is the bootstrap default feed set and a human reference for which sources are "known".
 
 ## AI & LLM
 
@@ -18,6 +18,7 @@ This file also serves as the **tier classification reference** — feeds listed 
 | Gwern | `https://gwern.substack.com/feed` | Long-form essays + statistics + AI综述 |
 | Max Woolf (minimaxir) | `https://minimaxir.com/index.xml` | Data science + LLM experiments, hands-on |
 | Geoffrey Litt | `https://www.geoffreylitt.com/feed.xml` | Malleable software + AI tooling experiments |
+| Anthropic Engineering | `https://raw.githubusercontent.com/conoro/anthropic-engineering-rss-feed/main/anthropic_engineering_rss.xml` | Engineering posts (e.g. agent-building). **3rd-party scraper** — no official Anthropic RSS; can break silently, so watch `feeds_ok` |
 
 ## Engineering & Programming
 
