@@ -58,8 +58,10 @@ absolute score is what collapsed v2 to a constant):
 - **Floor (default 0.4)** — drop everything below it. If nothing clears the
   floor, the result is empty → the run is `[SILENT]`. The floor is the one tuning
   knob; calibrate it from the dry-run score distribution rather than guessing.
-- **Rank** — score descending, tie-broken by newer `published`. Source tier
-  (curated-feeds.md) is only a soft tiebreaker, **not** a multiplier.
+- **Rank** — score descending, tie-broken by newer `published`. Source quality is
+  reflected in the LLM relevance score (via taste.md's positive anchors), **not**
+  as a separate mechanical multiplier or tiebreaker — the only deterministic
+  tiebreaker is recency.
 - **Same-source cap = 2** per source bucket. All `hnrss.org/*` share one
   "hackernews" bucket so HN can't dominate; every other feed is its own bucket.
 - **Top-N** — take `count` (default 5, cap 7).

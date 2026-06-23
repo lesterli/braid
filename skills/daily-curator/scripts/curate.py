@@ -52,15 +52,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from canon import (  # noqa: E402
     canonicalize_url, parse_date, today_utc,
     load_seen_urls, prune_seen, append_seen,
+    state_home, unwrap_list, read_jsonl,
 )
 import health  # noqa: E402
-from datetime import timedelta  # noqa: E402
 
 FRESHNESS_WINDOW_DAYS = 14
+FUTURE_GRACE_DAYS = 2   # tolerate small clock skew; drop far-future junk dates
 DEFAULT_COUNT = 5
 DEFAULT_FLOOR = 0.4
 SAME_SOURCE_CAP = 2
 TMP_KEEP_RUNS = 3
+SHOWN_FILE = "shown.jsonl"      # structured ledger of shown items (weekly roundup reads it)
+SHOWN_WINDOW_DAYS = 35
 FETCH_TIMEOUT = 12
 UA = "Mozilla/5.0 (compatible; DailyCurator/3.0)"
 
@@ -150,9 +153,13 @@ def parse_feed(xml_text: str, feed_url: str) -> list[dict]:
         if _local(el.tag) not in ("item", "entry"):
             continue
         title = _child_text(el, {"title"})
-        url = _atom_link(el)
+        url = _atom_link(el) or _child_text(el, {"link"})
         if not url:
-            url = _child_text(el, {"link", "guid", "id"})
+            # guid/id only when it is an actual link, not an opaque id like
+            # "tag:example.com,2026:123" (RSS guid isPermaLink="false")
+            gid = _child_text(el, {"guid", "id"})
+            if gid.startswith(("http://", "https://")):
+                url = gid
         url = canonicalize_url(url)
         if not url:
             continue
@@ -175,11 +182,13 @@ def parse_feed(xml_text: str, feed_url: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 def is_fresh(published: str | None, today: date,
              window: int = FRESHNESS_WINDOW_DAYS) -> bool:
-    """Keep items published within `window` days. No-date items are kept."""
+    """Keep items published within `window` days. No-date items are kept.
+    Far-future dates (misconfigured/post-dated feeds) are dropped as junk; a
+    small future grace absorbs clock skew."""
     d = parse_date(published)
     if d is None:
         return True
-    return 0 <= (today - d).days <= window or d > today
+    return -FUTURE_GRACE_DAYS <= (today - d).days <= window
 
 
 def title_matches_negative(title: str, patterns: list[str]) -> bool:
@@ -192,19 +201,18 @@ def title_matches_negative(title: str, patterns: list[str]) -> bool:
 
 
 def load_negative_patterns(home: str) -> list[str]:
-    """Patterns from <home>/negative-anchors.txt (one regex per line) if present,
-    else the built-in default. Keeps the literal set in one editable place."""
+    """Built-in patterns PLUS any in <home>/negative-anchors.txt (one regex per
+    line, '#' comments). The file EXTENDS the defaults, it does not replace them,
+    so adding one custom anchor never silently drops the 11 built-ins."""
+    patterns = list(DEFAULT_NEGATIVE_PATTERNS)
     path = os.path.join(home, "negative-anchors.txt")
     if os.path.exists(path):
-        out = []
         with open(path, encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
-                if line and not line.startswith("#"):
-                    out.append(line)
-        if out:
-            return out
-    return list(DEFAULT_NEGATIVE_PATTERNS)
+                if line and not line.startswith("#") and line not in patterns:
+                    patterns.append(line)
+    return patterns
 
 
 def filter_candidates(entries: list[dict], seen_urls: set[str], today: date,
@@ -254,7 +262,9 @@ def select(scored: list[dict], count: int = DEFAULT_COUNT,
     for it in passing:
         if len(selected) >= count:
             break
-        bucket = it.get("source_bucket", it.get("url", ""))
+        # Fall back to the URL host (not the whole URL) if the LLM step dropped
+        # source_bucket, so the cap still binds instead of silently disabling.
+        bucket = it.get("source_bucket") or source_bucket(it.get("url", ""))
         if per_bucket.get(bucket, 0) >= cap:
             continue
         per_bucket[bucket] = per_bucket.get(bucket, 0) + 1
@@ -263,69 +273,57 @@ def select(scored: list[dict], count: int = DEFAULT_COUNT,
 
 
 # ---------------------------------------------------------------------------
-# Weekly roundup (parse prior digests; pure)
+# Shown ledger + weekly roundup (structured; no digest-prose parsing)
 # ---------------------------------------------------------------------------
-_TITLE_RE = re.compile(r"^\*\*\d+\.\s*\[(?P<title>.+?)\]\((?P<url>\S+?)\)\*\*\s*$")
-
-
-def parse_digest_items(text: str) -> list[dict]:
-    """Extract items from a rendered v3 digest. Each item is a title line
-    `**N. [title](url)**`, then a `Source:` line, then the why-line."""
-    lines = text.splitlines()
-    items: list[dict] = []
-    i = 0
-    while i < len(lines):
-        m = _TITLE_RE.match(lines[i].strip())
-        if not m:
-            i += 1
-            continue
-        item = {"title": m.group("title"), "url": canonicalize_url(m.group("url")),
-                "source": "", "why": ""}
-        # next non-empty line: Source; the one after: why
-        j = i + 1
-        while j < len(lines) and not lines[j].strip():
-            j += 1
-        if j < len(lines) and lines[j].strip().lower().startswith("source:"):
-            item["source"] = lines[j].split(":", 1)[1].strip()
-            k = j + 1
-            while k < len(lines) and not lines[k].strip():
-                k += 1
-            if k < len(lines) and not _TITLE_RE.match(lines[k].strip()) \
-                    and not lines[k].startswith("#"):
-                item["why"] = lines[k].strip()
-        items.append(item)
-        i += 1
-    return items
+def append_shown(home: str, items: list[dict], today: date) -> int:
+    """Record shown items (structured) to shown.jsonl so the weekly roundup
+    reads real data instead of re-parsing the LLM-authored digest prose. Pruned
+    to a rolling window on each write."""
+    path = os.path.join(home, SHOWN_FILE)
+    stamp = today.isoformat()
+    kept = [o for o in read_jsonl(path)
+            if parse_date(o.get("date_shown")) is None
+            or (today - parse_date(o.get("date_shown"))).days <= SHOWN_WINDOW_DAYS]
+    new = [{"url": canonicalize_url(it.get("url", "")),
+            "title": it.get("title", ""),
+            "source_bucket": it.get("source_bucket", ""),
+            "published": it.get("published", ""),
+            "summary": it.get("summary", ""),
+            "score": it.get("score"),
+            "date_shown": stamp}
+           for it in items if it.get("url")]
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        for row in kept + new:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    os.replace(tmp, path)
+    return len(new)
 
 
 def collect_week(home: str, days: int, today: date) -> list[dict]:
-    """Items from the last `days` daily digests (most recent first), deduped."""
-    digests_dir = os.path.join(home, "digests")
+    """Items shown in the last `days` days, ranked best-first (score desc, then
+    newer), deduped by URL. Reads the structured shown.jsonl ledger."""
+    path = os.path.join(home, SHOWN_FILE)
     seen: set[str] = set()
     out: list[dict] = []
-    for back in range(days):
-        d = (today - timedelta(days=back)).isoformat()
-        path = os.path.join(digests_dir, f"{d}.md")
-        if not os.path.exists(path):
+    for obj in read_jsonl(path):
+        url = canonicalize_url(obj.get("url", ""))
+        d = parse_date(obj.get("date_shown"))
+        if not url or url in seen or d is None or (today - d).days >= days:
             continue
-        with open(path, encoding="utf-8") as fh:
-            for it in parse_digest_items(fh.read()):
-                if it["url"] and it["url"] not in seen:
-                    seen.add(it["url"])
-                    it["date"] = d
-                    out.append(it)
+        seen.add(url)
+        out.append(obj)
+
+    def rank(o):
+        d = parse_date(o.get("date_shown"))
+        return (-(o.get("score") or 0), -(d.toordinal() if d else 0))
+    out.sort(key=rank)
     return out
 
 
 # ---------------------------------------------------------------------------
 # Paths + tmp hygiene
 # ---------------------------------------------------------------------------
-def state_home(arg_home: str | None) -> str:
-    if arg_home:
-        return os.path.expanduser(arg_home)
-    return os.path.expanduser(os.environ.get("DAILY_CURATOR_HOME", "~/.daily-curator"))
-
-
 def _prune_tmp(tmp_dir: str, keep: int = TMP_KEEP_RUNS) -> None:
     """Keep only the last `keep` fetched-*.xml debug dumps."""
     if not os.path.isdir(tmp_dir):
@@ -368,33 +366,31 @@ def cmd_prepare(args) -> int:
 
     patterns = load_negative_patterns(home)
     all_entries: list[dict] = []
-    fetched_blobs: list[str] = []
     statuses: dict[str, str] = {}
     ok_feeds = 0
-    for url in feeds:
-        body = fetch_feed(url)
-        if body is None:
-            statuses[url] = "unreachable"
-            continue
-        fetched_blobs.append(f"<!-- {url} -->\n{body}")
-        entries = parse_feed(body, url)
-        if entries:
-            statuses[url] = "ok"
-            ok_feeds += 1
-            all_entries.extend(entries)
-        else:
-            statuses[url] = "empty"
+    # Stream each feed body straight to the debug dump instead of holding all
+    # ~15MB of XML in memory and joining at the end.
+    dump_path = os.path.join(tmp_dir, f"fetched-{today.isoformat()}.xml")
+    with open(dump_path, "w", encoding="utf-8") as dump:
+        for url in feeds:
+            body = fetch_feed(url)
+            if body is None:
+                statuses[url] = "unreachable"
+                continue
+            dump.write(f"<!-- {url} -->\n{body}\n")
+            entries = parse_feed(body, url)
+            if entries:
+                statuses[url] = "ok"
+                ok_feeds += 1
+                all_entries.extend(entries)
+            else:
+                statuses[url] = "empty"
     # Record per-feed health (a working feed always returns its backlog, so this
     # is cadence-independent — see health.py). Alerting is a separate step.
     health.record_run(home, statuses, today)
+    _prune_tmp(tmp_dir)
 
     candidates = filter_candidates(all_entries, seen_urls, today, patterns, args.window)
-
-    # Debug dump (kept last N runs only), then prune older dumps.
-    with open(os.path.join(tmp_dir, f"fetched-{today.isoformat()}.xml"), "w",
-              encoding="utf-8") as fh:
-        fh.write("\n".join(fetched_blobs))
-    _prune_tmp(tmp_dir)
 
     out = {
         "generated_at": today.isoformat(),
@@ -419,7 +415,7 @@ def cmd_prepare(args) -> int:
 def cmd_select(args) -> int:
     with open(args.scored, encoding="utf-8") as fh:
         data = json.load(fh)
-    scored = data.get("candidates", data) if isinstance(data, dict) else data
+    scored = unwrap_list(data, "candidates")
     selected = select(scored, args.count, args.floor)
     out = {"count": len(selected), "floor": args.floor, "selected": selected}
     json.dump(out, sys.stdout, ensure_ascii=False, indent=2)
@@ -432,12 +428,14 @@ def cmd_select(args) -> int:
 def cmd_mark_seen(args) -> int:
     home = state_home(args.home)
     seen_path = os.path.join(home, "seen.txt")
+    today = today_utc()
     with open(args.selected, encoding="utf-8") as fh:
         data = json.load(fh)
-    items = data.get("selected", data) if isinstance(data, dict) else data
+    items = unwrap_list(data, "selected")
     urls = [it["url"] for it in items if it.get("url")]
     n = append_seen(seen_path, urls)
-    print(f"[mark-seen] appended {n} url(s) to {seen_path}", file=sys.stderr)
+    append_shown(home, items, today)
+    print(f"[mark-seen] appended {n} url(s) to seen.txt + shown.jsonl", file=sys.stderr)
     return 0
 
 

@@ -54,6 +54,11 @@ def canonicalize_url(url: str) -> str:
         return ""
     scheme = parts.scheme.lower()
     netloc = parts.netloc.lower()
+    # Drop a redundant default port so :80/:443 forms dedup with the bare host.
+    if scheme == "http" and netloc.endswith(":80"):
+        netloc = netloc[:-3]
+    elif scheme == "https" and netloc.endswith(":443"):
+        netloc = netloc[:-4]
     path = parts.path
     if len(path) > 1 and path.endswith("/"):
         path = path.rstrip("/")
@@ -77,14 +82,14 @@ def parse_date(value: str | None) -> date | None:
     # Atom / ISO 8601 first (e.g. 2026-06-02T12:00:00Z, 2026-06-02)
     iso = value.replace("Z", "+00:00")
     try:
-        return datetime.fromisoformat(iso).date()
+        return _utc_date(datetime.fromisoformat(iso))
     except ValueError:
         pass
     # RSS / RFC 822 (e.g. Mon, 02 Jun 2026 12:00:00 GMT)
     try:
         dt = parsedate_to_datetime(value)
         if dt is not None:
-            return dt.date()
+            return _utc_date(dt)
     except (TypeError, ValueError):
         pass
     # Bare date prefix fallback (e.g. "2026-06-02 ...")
@@ -99,24 +104,58 @@ def today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
 
-def load_seen(path: str) -> list[dict]:
-    """Read seen.txt as a list of {"url","date_shown"} dicts. Tolerant of blank
-    lines and malformed rows (skips them rather than crashing a cron run)."""
-    rows: list[dict] = []
+def _utc_date(dt: datetime) -> date:
+    """Calendar date of an instant in UTC. A tz-aware datetime is converted to
+    UTC first so freshness (compared against today_utc) isn't off by a day for
+    feeds that stamp local time, e.g. '...01:00:00 +0800' is 2026-06-01 UTC."""
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc)
+    return dt.date()
+
+
+def read_jsonl(path: str):
+    """Yield parsed objects from a JSONL file, tolerant of blank/malformed lines
+    and a missing file. One place for the parse-tolerance rules so every reader
+    (seen ledger, migration, shown ledger) agrees."""
     if not path or not os.path.exists(path):
-        return rows
+        return
     with open(path, "r", encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if not line:
                 continue
             try:
-                obj = json.loads(line)
+                yield json.loads(line)
             except json.JSONDecodeError:
                 continue
-            url = canonicalize_url(obj.get("url", ""))
-            if not url:
-                continue
+
+
+def state_home(arg_home: str | None = None) -> str:
+    """Resolve the curator state dir: explicit arg, then $DAILY_CURATOR_HOME,
+    then ~/.daily-curator. Single source of truth for all scripts."""
+    if arg_home:
+        return os.path.expanduser(arg_home)
+    return os.path.expanduser(os.environ.get("DAILY_CURATOR_HOME", "~/.daily-curator"))
+
+
+def unwrap_list(data, key: str) -> list:
+    """Return a list from either a bare list or a {key: [...]} wrapper. Anything
+    else (a dict missing `key`, a scalar) yields [] — never iterates dict keys,
+    which would crash on `.get` downstream."""
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict) and isinstance(data.get(key), list):
+        return data[key]
+    return []
+
+
+def load_seen(path: str) -> list[dict]:
+    """Read seen.txt as a list of {"url","date_shown"} dicts. Tolerant of blank
+    lines and malformed rows (skips them rather than crashing a cron run)."""
+    rows: list[dict] = []
+    for obj in read_jsonl(path):
+        url = canonicalize_url(obj.get("url", ""))
+        if url:
             rows.append({"url": url, "date_shown": obj.get("date_shown", "")})
     return rows
 

@@ -56,7 +56,7 @@ re-competes tomorrow while still inside the 14-day freshness window.
 | `~/.daily-curator/feeds.txt` | Personal RSS/Atom feed list |
 | `~/.daily-curator/taste.md` | Taste profile: axes + positive/negative anchors |
 | `~/.daily-curator/seen.txt` | JSONL ledger of shown URLs (dedup only; auto-pruned to 30d) |
-| `~/.daily-curator/negative-anchors.txt` | Optional: one regex per line; overrides the built-in title pre-filter |
+| `~/.daily-curator/negative-anchors.txt` | Optional: one regex per line; **extends** the built-in title pre-filter (does not replace it) |
 | `~/.daily-curator/digests/YYYY-MM-DD.md` | Per-run output |
 
 Conversational feed management (all persist to `feeds.txt`):
@@ -122,9 +122,11 @@ floor or beyond the cap are simply not selected — they are NOT recorded, so th
 re-compete next run.
 
 ### Step 5: Write the digest (only if there is content)
-If `selected` is non-empty, write `~/.daily-curator/digests/<today>.md` as clean
-human Markdown, starting at an H1, **no YAML frontmatter and no hidden score
-comments** (the v2 machine layer is gone). One item per pick:
+If `selected` is non-empty, write the digest as clean human Markdown, starting at
+an H1, **no YAML frontmatter and no hidden score comments** (the v2 machine layer
+is gone). Path: `~/.daily-curator/digests/<today>.md` on a normal run, but
+**`tmp/digest-<today>.md` when `dry_run`** — so a shadow run never creates the
+real file the Step 1 guard keys on. One item per pick:
 ```
 **1. [Title](https://canonical-url)**
 Source: <Source> · <Nd ago>
@@ -132,16 +134,16 @@ Source: <Source> · <Nd ago>
 ```
 
 ### Step 6: Persist + verify (deterministic)
+Let `<digest>` be the path written in Step 5. On a normal run:
 ```bash
-python3 scripts/curate.py mark-seen --selected tmp/selected.json   # skip if dry_run
-python3 scripts/verify-run.py --selected tmp/selected.json \
-    --digest ~/.daily-curator/digests/<today>.md \
+python3 scripts/curate.py mark-seen --selected tmp/selected.json
+python3 scripts/verify-run.py --selected tmp/selected.json --digest <digest> \
     --seen ~/.daily-curator/seen.txt --snapshot tmp/seen-snapshot.json
 python3 scripts/health.py check   # prints a stale-feed alert (or nothing) — see Step 7
 ```
 If `verify-run.py` exits non-zero, do NOT deliver — report the failure instead.
-In `dry_run`, write the digest under `tmp/` only, skip `mark-seen`, and log the
-brief that *would* have been pushed.
+In `dry_run`: skip `mark-seen` (state stays untouched), still run `verify-run` and
+`health.py check` against the tmp digest, and log the brief that *would* push.
 
 ### Step 7: Deliver (a feed alert can override silence)
 Decide the final reply by precedence:
@@ -160,10 +162,15 @@ goes dark for a week (and a 7-day silence then means something is broken).
 ```bash
 python3 scripts/curate.py roundup --days 7   # items from the last 7 daily digests
 ```
-Pick the 3–5 strongest items from that set — no new scoring, reuse what was
-already chosen this week — and write a short "本周精选" brief in the weekly format
-(see [references/output-format.md](./references/output-format.md)). If the week
-produced nothing, send a one-line "本周无新增。" rather than `[SILENT]`.
+`roundup` returns the week's shown items ranked best-first (by score). Pick the
+3–5 strongest — no new scoring — and write a short "本周精选" brief in the weekly
+format (see [references/output-format.md](./references/output-format.md)). Write it
+to `~/.daily-curator/digests/<today>-weekly.md` (a distinct name so it never
+collides with the daily file or the daily idempotency guard). If the week produced
+nothing, send a one-line "本周无新增。" rather than `[SILENT]`.
+
+Note: this heartbeat only holds once the Sunday `mode=weekly` cron entry is
+installed (see the cutover playbook); nothing else triggers the weekly run.
 
 ## Feed health
 `curate.py prepare` records each feed's fetch outcome to `feed-health.json`.

@@ -26,13 +26,13 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canon import canonicalize_url, load_seen_urls  # noqa: E402
+from canon import canonicalize_url, load_seen_urls, unwrap_list  # noqa: E402
 
 
 def _load_selected_urls(path: str) -> list[str]:
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
-    items = data.get("selected", data) if isinstance(data, dict) else data
+    items = unwrap_list(data, "selected")
     return [canonicalize_url(it["url"]) for it in items if it.get("url")]
 
 
@@ -62,8 +62,12 @@ def check_digest_body(text: str) -> list[str]:
 
 
 def verify(selected_urls: list[str], digest_path: str, seen_urls: set[str],
-           snapshot_urls: set[str]) -> list[str]:
-    """Pure check core. Returns a list of failure strings (empty = PASS)."""
+           snapshot_urls: set[str], snapshot_ok: bool = True) -> list[str]:
+    """Pure check core. Returns a list of failure strings (empty = PASS).
+
+    snapshot_ok is False when a snapshot path was given but the file is missing —
+    then the re-show check cannot run, which is itself a failure on a content day
+    (don't silently pass the dedup-regression guard)."""
     failures: list[str] = []
 
     if not selected_urls:
@@ -80,10 +84,14 @@ def verify(selected_urls: list[str], digest_path: str, seen_urls: set[str],
         failures.append(f"{len(missing)} shown URL(s) not in seen.txt "
                         f"(dedup integrity): {missing[:3]}")
 
-    re_shown = [u for u in selected_urls if u in snapshot_urls]
-    if re_shown:
-        failures.append(f"{len(re_shown)} shown URL(s) were already seen before "
-                        f"this run (re-showed a seen item): {re_shown[:3]}")
+    if not snapshot_ok:
+        failures.append("seen-snapshot missing — cannot verify nothing was "
+                        "re-shown; refusing to pass the dedup-regression check")
+    else:
+        re_shown = [u for u in selected_urls if u in snapshot_urls]
+        if re_shown:
+            failures.append(f"{len(re_shown)} shown URL(s) were already seen before "
+                            f"this run (re-showed a seen item): {re_shown[:3]}")
 
     return failures
 
@@ -99,8 +107,11 @@ def main(argv=None) -> int:
     selected_urls = _load_selected_urls(args.selected)
     seen_urls = load_seen_urls(args.seen)
     snapshot_urls = _load_snapshot(args.snapshot)
+    # snapshot_ok: True if no snapshot was requested (opt-out) or the file exists;
+    # False if a path was given but the file is missing (can't verify re-show).
+    snapshot_ok = (not args.snapshot) or os.path.exists(args.snapshot)
 
-    failures = verify(selected_urls, args.digest, seen_urls, snapshot_urls)
+    failures = verify(selected_urls, args.digest, seen_urls, snapshot_urls, snapshot_ok)
 
     if not selected_urls:
         print("[verify] PASS — [SILENT] day, nothing to deliver")

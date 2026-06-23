@@ -179,6 +179,23 @@ class TestMigrate(unittest.TestCase):
             self.assertEqual(migrate.dedupe(urls), ["https://a.com/1"])
         self.assertEqual(migrate.extract_urls("/no/such/file"), [])
 
+    def test_guard_refuses_when_complete(self):
+        with tempfile.TemporaryDirectory() as home:
+            with open(os.path.join(home, "seen.txt"), "w") as fh:
+                fh.write('{"url":"https://x/1","date_shown":"2026-06-23"}\n')
+            self.assertEqual(migrate.main(["--home", home]), 2,
+                             "seen populated + no queued/read -> already complete -> refuse")
+
+    def test_guard_resumes_when_half_migrated(self):
+        with tempfile.TemporaryDirectory() as home:
+            with open(os.path.join(home, "seen.txt"), "w") as fh:
+                fh.write('{"url":"https://x/1","date_shown":"2026-06-23"}\n')
+            with open(os.path.join(home, "queued.txt"), "w") as fh:
+                fh.write('{"url":"https://x/2"}\n')
+            self.assertEqual(migrate.main(["--home", home]), 0, "half-migrated -> resume w/o --force")
+            self.assertIn("https://x/2", canon.load_seen_urls(os.path.join(home, "seen.txt")))
+            self.assertFalse(os.path.exists(os.path.join(home, "queued.txt")))
+
 
 class TestVerify(unittest.TestCase):
     def test_pass(self):
@@ -240,36 +257,80 @@ class TestHealth(unittest.TestCase):
         self.assertEqual(due, {"x", "z"}, "y was alerted within cadence, not due")
 
 
-class TestRoundup(unittest.TestCase):
-    DIGEST = ("# 今日推荐 | 2026-06-22\n\n"
-              "**1. [First Post](https://ex.com/a/#frag)**\n"
-              "Source: Simon Willison · 1d ago\n"
-              "Why the first one matters.\n\n"
-              "**2. [Second Post](https://ex.com/b)**\n"
-              "Source: Latent Space · 3d ago\n"
-              "Why the second one matters.\n")
-
-    def test_parse_digest_items(self):
-        items = curate.parse_digest_items(self.DIGEST)
-        self.assertEqual(len(items), 2)
-        self.assertEqual(items[0]["url"], "https://ex.com/a", "fragment stripped")
-        self.assertEqual(items[0]["title"], "First Post")
-        self.assertEqual(items[0]["source"], "Simon Willison · 1d ago")
-        self.assertEqual(items[0]["why"], "Why the first one matters.")
-
-    def test_collect_week_dedup(self):
+class TestShownAndRoundup(unittest.TestCase):
+    def test_append_and_rank(self):
         with tempfile.TemporaryDirectory() as home:
-            dd = os.path.join(home, "digests")
-            os.makedirs(dd)
-            with open(os.path.join(dd, "2026-06-23.md"), "w") as fh:
-                fh.write("# 今日推荐 | 2026-06-23\n\n"
-                         "**1. [Today](https://ex.com/today)**\nSource: X · 0d ago\nwhy\n")
-            with open(os.path.join(dd, "2026-06-22.md"), "w") as fh:
-                fh.write(self.DIGEST)
-            items = curate.collect_week(home, 7, TODAY)
-            urls = [it["url"] for it in items]
-            self.assertEqual(urls, ["https://ex.com/today", "https://ex.com/a", "https://ex.com/b"])
-            self.assertEqual(items[0]["date"], "2026-06-23", "most recent first")
+            curate.append_shown(home, [
+                {"url": "https://ex.com/a/#frag", "title": "A", "score": 0.9},
+                {"url": "https://ex.com/b", "title": "B", "score": 0.6},
+            ], date(2026, 6, 22))
+            curate.append_shown(home, [{"url": "https://ex.com/c", "score": 0.95}], date(2026, 6, 23))
+            got = curate.collect_week(home, 7, TODAY)
+            # ranked by score desc; a's fragment stripped on the way into the ledger
+            self.assertEqual([o["url"] for o in got],
+                             ["https://ex.com/c", "https://ex.com/a", "https://ex.com/b"])
+
+    def test_window_excludes_old(self):
+        with tempfile.TemporaryDirectory() as home:
+            curate.append_shown(home, [{"url": "https://ex.com/old", "score": 0.9}], date(2026, 6, 1))
+            curate.append_shown(home, [{"url": "https://ex.com/new", "score": 0.5}], date(2026, 6, 23))
+            got = curate.collect_week(home, 7, TODAY)
+            self.assertEqual([o["url"] for o in got], ["https://ex.com/new"])
+
+    def test_dedup_across_days(self):
+        with tempfile.TemporaryDirectory() as home:
+            curate.append_shown(home, [{"url": "https://ex.com/x", "score": 0.5}], date(2026, 6, 22))
+            curate.append_shown(home, [{"url": "https://ex.com/x", "score": 0.5}], date(2026, 6, 23))
+            got = curate.collect_week(home, 7, TODAY)
+            self.assertEqual(len(got), 1)
+
+
+class TestReviewFixes(unittest.TestCase):
+    def test_canonical_default_ports(self):
+        self.assertEqual(canon.canonicalize_url("http://ex.com:80/a"), "http://ex.com/a")
+        self.assertEqual(canon.canonicalize_url("https://ex.com:443/a"), "https://ex.com/a")
+        self.assertEqual(canon.canonicalize_url("http://ex.com:8080/a"), "http://ex.com:8080/a")
+
+    def test_parse_date_tz_to_utc(self):
+        # 01:00 +08:00 is the previous calendar day in UTC
+        self.assertEqual(canon.parse_date("2026-06-02T01:00:00+08:00"), date(2026, 6, 1))
+        self.assertEqual(canon.parse_date("Tue, 02 Jun 2026 01:00:00 +0800"), date(2026, 6, 1))
+
+    def test_is_fresh_drops_far_future(self):
+        self.assertTrue(curate.is_fresh("2026-06-24", TODAY), "1d future kept (skew grace)")
+        self.assertFalse(curate.is_fresh("2026-07-10", TODAY), "far future dropped as junk")
+
+    def test_guid_non_url_not_used(self):
+        rss = ('<?xml version="1.0"?><rss version="2.0"><channel><title>F</title>'
+               '<item><title>No link</title>'
+               '<guid isPermaLink="false">tag:example.com,2026:1234</guid>'
+               '<pubDate>Sun, 22 Jun 2026 08:00:00 GMT</pubDate></item></channel></rss>')
+        out = curate.parse_feed(rss, "https://ex.com/feed")
+        self.assertEqual(out, [], "opaque guid must not become the URL")
+
+    def test_select_bucket_fallback_to_host(self):
+        # source_bucket missing -> fall back to URL host so the cap still binds
+        scored = [{"url": f"https://hn.example/{i}", "score": 0.9 - i * 0.01} for i in range(4)]
+        sel = curate.select(scored, count=5, floor=0.4)
+        self.assertEqual(len(sel), 2, "same-host cap=2 applies even without source_bucket")
+
+    def test_negative_anchors_extend_not_replace(self):
+        with tempfile.TemporaryDirectory() as home:
+            with open(os.path.join(home, "negative-anchors.txt"), "w") as fh:
+                fh.write("custompat\n")
+            pats = curate.load_negative_patterns(home)
+            self.assertIn("custompat", pats)
+            self.assertIn(r"融资", pats, "built-ins are extended, not replaced")
+
+    def test_unwrap_list(self):
+        self.assertEqual(canon.unwrap_list({"selected": [1, 2]}, "selected"), [1, 2])
+        self.assertEqual(canon.unwrap_list([1, 2], "selected"), [1, 2])
+        self.assertEqual(canon.unwrap_list({"count": 5}, "selected"), [],
+                         "dict missing key -> [] (no crash iterating keys)")
+
+    def test_verify_snapshot_missing_fails(self):
+        f = verify_run.verify(["https://a/1"], _digest_ok(), {"https://a/1"}, set(), snapshot_ok=False)
+        self.assertTrue(any("snapshot missing" in x for x in f))
 
 
 _DIGEST_HANDLES = []

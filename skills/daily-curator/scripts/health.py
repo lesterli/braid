@@ -34,7 +34,7 @@ import sys
 from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canon import parse_date, today_utc  # noqa: E402
+from canon import parse_date, today_utc, state_home  # noqa: E402
 
 HEALTH_FILE = "feed-health.json"
 STALE_THRESHOLD_DAYS = 14
@@ -129,8 +129,7 @@ def format_alert(due: list[str], data: dict) -> str:
 
 
 def cmd_check(args) -> int:
-    home = os.path.expanduser(
-        args.home or os.environ.get("DAILY_CURATOR_HOME", "~/.daily-curator"))
+    home = state_home(args.home)
     today = today_utc()
     data = load_health(home)
     stale = stale_feeds(data, today, args.threshold)

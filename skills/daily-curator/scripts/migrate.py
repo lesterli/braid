@@ -24,34 +24,25 @@ the backup. State dir defaults to $DAILY_CURATOR_HOME or ~/.daily-curator.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import shutil
 import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canon import canonicalize_url, append_seen, load_seen_urls, today_utc  # noqa: E402
+from canon import (  # noqa: E402
+    canonicalize_url, append_seen, load_seen_urls, today_utc, read_jsonl, state_home,
+)
 
 
 def extract_urls(jsonl_path: str) -> list[str]:
     """Canonical URLs from a v2 queued.txt/read.txt JSONL file, in file order.
     Tolerant of blank/malformed lines. Missing file -> []."""
     urls: list[str] = []
-    if not os.path.exists(jsonl_path):
-        return urls
-    with open(jsonl_path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            url = canonicalize_url(obj.get("url", ""))
-            if url:
-                urls.append(url)
+    for obj in read_jsonl(jsonl_path):
+        url = canonicalize_url(obj.get("url", ""))
+        if url:
+            urls.append(url)
     return urls
 
 
@@ -79,12 +70,11 @@ def _dir_size(path: str) -> int:
     return total
 
 
-def _human(n: int) -> str:
+def _human(n: float) -> str:
     for unit in ("B", "KB", "MB", "GB"):
         if n < 1024 or unit == "GB":
-            return f"{n:.1f}{unit}" if unit != "B" else f"{n}B"
+            return f"{n}B" if unit == "B" else f"{n:.1f}{unit}"
         n /= 1024
-    return f"{n:.1f}GB"
 
 
 def main(argv=None) -> int:
@@ -98,8 +88,7 @@ def main(argv=None) -> int:
                    help="keep tmp_fetch.out and tmp/* (skip the disk reclaim)")
     args = p.parse_args(argv)
 
-    home = os.path.expanduser(
-        args.home or os.environ.get("DAILY_CURATOR_HOME", "~/.daily-curator"))
+    home = state_home(args.home)
     seen_path = os.path.join(home, "seen.txt")
     queued = os.path.join(home, "queued.txt")
     read = os.path.join(home, "read.txt")
@@ -111,9 +100,15 @@ def main(argv=None) -> int:
         return 2
 
     existing = load_seen_urls(seen_path)
-    if existing and not args.force:
-        print(f"[error] {seen_path} already has {len(existing)} entries; "
-              f"refusing to re-migrate. Use --force to override.", file=sys.stderr)
+    sources_present = os.path.exists(queued) or os.path.exists(read)
+    # Refuse only when a migration already COMPLETED (seen populated AND the
+    # source files gone). If seen is populated but queued/read still exist, this
+    # is a half-finished migration — resume it (append_seen dedups, so re-seeding
+    # is safe) rather than forcing the operator to reach for --force.
+    if existing and not sources_present and not args.force:
+        print(f"[error] {seen_path} already has {len(existing)} entries and "
+              f"queued/read are gone — migration already complete. Use --force "
+              f"to re-run anyway.", file=sys.stderr)
         return 2
 
     urls = dedupe(extract_urls(queued) + extract_urls(read))
@@ -156,10 +151,10 @@ def main(argv=None) -> int:
         for t in targets:
             if not os.path.exists(t):
                 continue
-            freed += _dir_size(t)
+            sz = _dir_size(t)
+            freed += sz
             if dry:
-                print(f"[migrate] would purge {t} ({_human(_dir_size(t))})",
-                      file=sys.stderr)
+                print(f"[migrate] would purge {t} ({_human(sz)})", file=sys.stderr)
             else:
                 if os.path.isdir(t):
                     shutil.rmtree(t, ignore_errors=True)
