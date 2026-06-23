@@ -7,7 +7,8 @@
 #   bash import-opml.sh https://example.com/feeds.opml
 #   curl -sL https://example.com/feeds.opml | bash import-opml.sh
 #
-# Output: One feed URL per line (suitable for piping to fetch-feeds.sh)
+# Output: One feed URL per line (append to ~/.daily-curator/feeds.txt;
+#         curate.py prepare fetches them on the next run)
 
 set -euo pipefail
 
