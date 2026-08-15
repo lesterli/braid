@@ -47,14 +47,4 @@ Note: `hnrss.org/best` was tried earlier and removed — its precision under thi
 
 ---
 
-## How Feeds Work
-
-**User's personal feeds** are stored in `~/.daily-curator/feeds.txt` (one URL per line). This is the primary source list once it exists.
-
-Common user actions — all persisted to `feeds.txt`:
-
-- "关注 https://example.com/feed.xml" → append URL
-- "取消关注 example.com" → remove matching line
-- "导入 OPML https://..." → extract all feed URLs via `bash "$SKILL_DIR/scripts/import-opml.sh"` and append
-
-If `feeds.txt` is missing, run `curate.py bootstrap` — that is the only setup path. "关注" and OPML import then append to the existing file.
+Feed add/remove/list/OPML: see [feed-management.md](./feed-management.md).

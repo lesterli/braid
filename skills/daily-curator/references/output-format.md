@@ -1,49 +1,8 @@
 # Output Format
 
-The digest is a single clean, human-readable Markdown document — no YAML
-frontmatter and no hidden `_scores` comments. The file written to disk and the
-chat reply are identical, starting at the H1.
-
-## File path & naming
-
-`~/.daily-curator/digests/YYYY-MM-DD.md`. The same-day idempotency guard means a
-real re-run does NOT overwrite-and-re-push; it stays `[SILENT]` (use
-`force_regen` to deliberately regenerate). In `dry_run`, write under `tmp/`
-instead so the guard, `seen.txt`, and `shown.jsonl` stay untouched.
-
-## Daily digest format
-
-```markdown
-# 今日推荐 | YYYY-MM-DD
-
-**1. [Article Title](https://canonical-url)**
-Source: Author or Blog Name · 1d ago
-One concrete line naming the article's actual artifact, claim, method, or tension.
-
-**2. [Article Title](https://canonical-url)**
-Source: Author or Blog Name · 3d ago
-What makes this one worth opening — specific, not a generic category.
-```
-
-That is the whole file. Items are ranked best-first (see scoring-and-filtering.md).
-
-## Item writing rules
-
-- The title line is the primary action and MUST be a Markdown link:
-  `**N. [Title](https://...)**`. Never a bare title when a URL exists.
-- Use the **canonical** URL (fragment stripped) so a click matches what dedup
-  recorded.
-- No boilerplate lead-ins (`一句话点评：`, `一句话策展人点评：`). The line after
-  `Source:` is the recommendation itself.
-- Each line must name the article's specific object/claim/method/artifact. If the
-  RSS summary is too thin to support that, state the concrete known signal rather
-  than inventing substance. Do not repeat a generic line across items.
-- Keep it grounded in the fetched content, never hallucinated.
-
-## Silent day
-
-If nothing clears the floor, do **not** write a digest file and do **not** pad.
-Respond with exactly `[SILENT]` so the cron suppresses delivery.
+Load this file when rendering **weekly** output (see [weekly.md](./weekly.md)).
+The daily digest template lives inline in `SKILL.md` — do not come here for a
+normal daily run.
 
 ## Weekly roundup (mode=weekly, Sundays)
 

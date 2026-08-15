@@ -19,15 +19,6 @@ A short reading brief. Scripts own fetch, dedup, select, persist, and verify.
 You own the 0–1 `score` and the one-line "why it matters". Never pad: a short
 brief or `[SILENT]` is honest.
 
-Feed-management triggers (persist to `feeds.txt` / `taste.md` only — do not
-run the daily pipeline):
-
-- "关注 https://example.com/feed.xml" → append to `feeds.txt`
-- "取消关注 example.com" → remove the matching line
-- "我的信源" / "list feeds" → show `feeds.txt`
-- "导入 OPML …" → `bash "$SKILL_DIR/scripts/import-opml.sh"` and append URLs
-- "调整口味" / "edit taste" → show `taste.md`, accept edits
-
 ## Critical gotchas
 
 - **Run from `$SKILL_DIR`** — the directory that contains this `SKILL.md`.
@@ -79,7 +70,7 @@ Read `$DAILY_CURATOR_HOME/taste.md`. Assign `score` ∈ [0, 1] by relative
 ranking anchored to that file (primary+positive ≈ 0.9, tertiary ≈ 0.5,
 negative ≈ 0.1; collapse semantic negatives to ≈ 0). Write
 `$DAILY_CURATOR_HOME/tmp/scored.json` (same wrapper as the prepare file).
-See [references/scoring-and-filtering.md](./references/scoring-and-filtering.md).
+Before scoring, read [references/scoring-and-filtering.md](./references/scoring-and-filtering.md).
 
 ### 5. Select
 
@@ -156,19 +147,15 @@ have been sent, deliver nothing.
 - Silent day + health alert → the alert text, not `[SILENT]`.
 - Silent day, no alert → exactly `[SILENT]`.
 
-## Weekly (`mode=weekly`)
+## Load when
 
-```bash
-python3 "$SKILL_DIR/scripts/curate.py" roundup --days 7 --home "$DAILY_CURATOR_HOME"
-```
+Do not preload references. There is no migration document.
 
-Reads `shown.jsonl` (not digest files), ranked by persisted score. Pick 3–5;
-write `$DAILY_CURATOR_HOME/digests/YYYY-MM-DD-weekly.md`. Empty week →
-`本周无新增。` not `[SILENT]`. Format:
-[references/output-format.md](./references/output-format.md).
+- **Before scoring** → [references/scoring-and-filtering.md](./references/scoring-and-filtering.md)
+- **Missing or first-run `taste.md`** → [references/taste-template.md](./references/taste-template.md)
+- **User is managing feeds or taste** (关注 / 取消关注 / 我的信源 / list feeds / 导入 OPML / 调整口味 / edit taste) → [references/feed-management.md](./references/feed-management.md)
+- **`mode=weekly` or 本周精选 / weekly roundup** → [references/weekly.md](./references/weekly.md), then [references/output-format.md](./references/output-format.md) for the weekly template only
+- **Feed-health rationale** (why backlog ≠ stale) → scoring-and-filtering.md, Feed health section
 
-## Feed health
-
-`prepare` records fetch outcomes. `health.py check` alerts on feeds with no
-parseable entry for >14 days (even on silent days), rate-limited weekly.
-A healthy feed always returns its backlog, so cadence is not modeled.
+The daily digest template, commands, and deliver rules above are complete.
+Do not open `output-format.md` on a daily run.
