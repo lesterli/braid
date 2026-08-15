@@ -7,7 +7,7 @@ or:
     cd skills/daily-curator/scripts && python3 -m unittest tests.test_curator
 
 Covers the deterministic, load-bearing paths (canonicalization, dedup,
-freshness, negative-anchor, select cap, feed parse, migration, verifier) plus
+freshness, negative-anchor, select cap, feed parse, verifier) plus
 one golden end-to-end run of the CLI over a file:// fixture (no network).
 """
 import json
@@ -23,7 +23,6 @@ sys.path.insert(0, SCRIPTS)
 
 import canon          # noqa: E402
 import curate         # noqa: E402
-import migrate        # noqa: E402
 import health         # noqa: E402
 
 # verify-run.py has a hyphen; load it by path.
@@ -163,38 +162,6 @@ class TestParse(unittest.TestCase):
         self.assertEqual(curate.parse_feed("<not xml", "u"), [])
         self.assertEqual(curate.source_bucket("https://hnrss.org/newest?q=AI"), "hackernews")
         self.assertEqual(curate.source_bucket("https://simonwillison.net/atom/"), "simonwillison.net")
-
-
-class TestMigrate(unittest.TestCase):
-    def test_extract_and_dedupe(self):
-        with tempfile.TemporaryDirectory() as d:
-            q = os.path.join(d, "queued.txt")
-            with open(q, "w") as fh:
-                fh.write(json.dumps({"url": "https://a.com/1/"}) + "\n")
-                fh.write("\n")  # blank
-                fh.write("not json\n")  # malformed
-                fh.write(json.dumps({"url": "https://a.com/1"}) + "\n")  # canon dup
-            urls = migrate.extract_urls(q)
-            self.assertEqual(urls, ["https://a.com/1", "https://a.com/1"])
-            self.assertEqual(migrate.dedupe(urls), ["https://a.com/1"])
-        self.assertEqual(migrate.extract_urls("/no/such/file"), [])
-
-    def test_guard_refuses_when_complete(self):
-        with tempfile.TemporaryDirectory() as home:
-            with open(os.path.join(home, "seen.txt"), "w") as fh:
-                fh.write('{"url":"https://x/1","date_shown":"2026-06-23"}\n')
-            self.assertEqual(migrate.main(["--home", home]), 2,
-                             "seen populated + no queued/read -> already complete -> refuse")
-
-    def test_guard_resumes_when_half_migrated(self):
-        with tempfile.TemporaryDirectory() as home:
-            with open(os.path.join(home, "seen.txt"), "w") as fh:
-                fh.write('{"url":"https://x/1","date_shown":"2026-06-23"}\n')
-            with open(os.path.join(home, "queued.txt"), "w") as fh:
-                fh.write('{"url":"https://x/2"}\n')
-            self.assertEqual(migrate.main(["--home", home]), 0, "half-migrated -> resume w/o --force")
-            self.assertIn("https://x/2", canon.load_seen_urls(os.path.join(home, "seen.txt")))
-            self.assertFalse(os.path.exists(os.path.join(home, "queued.txt")))
 
 
 class TestVerify(unittest.TestCase):
