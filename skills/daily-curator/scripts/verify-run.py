@@ -13,11 +13,18 @@ Checks (exit 1 on any failure, 0 if clean):
     - every shown URL is present in seen.txt        (dedup integrity)
     - no shown URL was already in seen BEFORE the run (didn't re-show a seen item)
   silent runs (selected empty): nothing to verify; a [SILENT] day is valid.
+  --dry-run: same digest + re-show checks, but selected URLs are treated as
+    would-be seen so a content run passes WITHOUT writing seen.txt / shown.jsonl.
 
 Usage (run from $SKILL_DIR; state paths are under $DAILY_CURATOR_HOME):
   python3 "$SKILL_DIR/scripts/verify-run.py" \\
       --selected "$DAILY_CURATOR_HOME/tmp/selected.json" \\
       --digest "$DAILY_CURATOR_HOME/digests/YYYY-MM-DD.md" \\
+      --seen "$DAILY_CURATOR_HOME/seen.txt" \\
+      --snapshot "$DAILY_CURATOR_HOME/tmp/seen-snapshot.json"
+  python3 "$SKILL_DIR/scripts/verify-run.py" --dry-run \\
+      --selected "$DAILY_CURATOR_HOME/tmp/selected.json" \\
+      --digest "$DAILY_CURATOR_HOME/tmp/digest-YYYY-MM-DD.md" \\
       --seen "$DAILY_CURATOR_HOME/seen.txt" \\
       --snapshot "$DAILY_CURATOR_HOME/tmp/seen-snapshot.json"
 """
@@ -65,12 +72,18 @@ def check_digest_body(text: str) -> list[str]:
 
 
 def verify(selected_urls: list[str], digest_path: str, seen_urls: set[str],
-           snapshot_urls: set[str], snapshot_ok: bool = True) -> list[str]:
+           snapshot_urls: set[str], snapshot_ok: bool = True,
+           dry_run: bool = False) -> list[str]:
     """Pure check core. Returns a list of failure strings (empty = PASS).
 
     snapshot_ok is False when a snapshot path was given but the file is missing —
     then the re-show check cannot run, which is itself a failure on a content day
-    (don't silently pass the dedup-regression guard)."""
+    (don't silently pass the dedup-regression guard).
+
+    dry_run treats selected URLs as would-be seen (skip the seen.txt membership
+    check) so a content dry run can pass without mark-seen. Re-show against the
+    pre-run snapshot still fails. Writes nothing.
+    """
     failures: list[str] = []
 
     if not selected_urls:
@@ -82,10 +95,11 @@ def verify(selected_urls: list[str], digest_path: str, seen_urls: set[str],
         with open(digest_path, encoding="utf-8") as fh:
             failures.extend(check_digest_body(fh.read()))
 
-    missing = [u for u in selected_urls if u not in seen_urls]
-    if missing:
-        failures.append(f"{len(missing)} shown URL(s) not in seen.txt "
-                        f"(dedup integrity): {missing[:3]}")
+    if not dry_run:
+        missing = [u for u in selected_urls if u not in seen_urls]
+        if missing:
+            failures.append(f"{len(missing)} shown URL(s) not in seen.txt "
+                            f"(dedup integrity): {missing[:3]}")
 
     if not snapshot_ok:
         failures.append("seen-snapshot missing — cannot verify nothing was "
@@ -105,6 +119,8 @@ def main(argv=None) -> int:
     p.add_argument("--digest", required=True)
     p.add_argument("--seen", required=True)
     p.add_argument("--snapshot")
+    p.add_argument("--dry-run", action="store_true",
+                   help="content dry run: treat selected as would-be seen; write nothing")
     args = p.parse_args(argv)
 
     selected_urls = _load_selected_urls(args.selected)
@@ -114,7 +130,8 @@ def main(argv=None) -> int:
     # False if a path was given but the file is missing (can't verify re-show).
     snapshot_ok = (not args.snapshot) or os.path.exists(args.snapshot)
 
-    failures = verify(selected_urls, args.digest, seen_urls, snapshot_urls, snapshot_ok)
+    failures = verify(selected_urls, args.digest, seen_urls, snapshot_urls,
+                      snapshot_ok, dry_run=args.dry_run)
 
     if not selected_urls:
         print("[verify] PASS — [SILENT] day, nothing to deliver")
@@ -124,7 +141,11 @@ def main(argv=None) -> int:
         for f in failures:
             print(f"  - {f}", file=sys.stderr)
         return 1
-    print(f"[verify] PASS — {len(selected_urls)} item(s), digest + dedup integrity OK")
+    if args.dry_run:
+        print(f"[verify] PASS — dry-run, {len(selected_urls)} item(s), "
+              f"digest + re-show check OK (seen.txt untouched)")
+    else:
+        print(f"[verify] PASS — {len(selected_urls)} item(s), digest + dedup integrity OK")
     return 0
 
 

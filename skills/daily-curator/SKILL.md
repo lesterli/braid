@@ -56,9 +56,9 @@ make the cut isn't recorded, so it re-competes tomorrow while still inside the
 - `count`: digest size, default **5** (hard cap 7).
 - `output_language`: user's language, fallback Chinese.
 - `mode`: `daily` (default) or `weekly` (the Sunday roundup — see below).
-- `dry_run`: default **false**. When true, run everything but write the digest
-  to `tmp/` only, do NOT mark-seen, and do NOT deliver — log what *would* push.
-  Used for the post-install shadow period before going live.
+- `dry_run`: default **false**. When true, write the digest under `tmp/` only,
+  skip `mark-seen`, verify with `--dry-run`, and do NOT deliver — log what
+  *would* push. Used for the post-install shadow period before going live.
 - `force_regen`: default **false**. Bypass the same-day idempotency guard when
   you deliberately want to regenerate today's brief (e.g. after editing taste.md).
 
@@ -183,8 +183,24 @@ python3 "$SKILL_DIR/scripts/verify-run.py" \
 python3 "$SKILL_DIR/scripts/health.py" check --home "$DAILY_CURATOR_HOME"
 ```
 If `verify-run.py` exits non-zero, do NOT deliver — report the failure instead.
-In `dry_run`: skip `mark-seen` (state stays untouched), still run `verify-run` and
-`health.py check` against the tmp digest, and log the brief that *would* push.
+
+In `dry_run`: skip `mark-seen`. Write the digest only to
+`$DAILY_CURATOR_HOME/tmp/digest-YYYY-MM-DD.md`. Then:
+
+```bash
+python3 "$SKILL_DIR/scripts/verify-run.py" --dry-run \
+    --selected "$DAILY_CURATOR_HOME/tmp/selected.json" \
+    --digest "$DAILY_CURATOR_HOME/tmp/digest-YYYY-MM-DD.md" \
+    --seen "$DAILY_CURATOR_HOME/seen.txt" \
+    --snapshot "$DAILY_CURATOR_HOME/tmp/seen-snapshot.json"
+python3 "$SKILL_DIR/scripts/health.py" check --dry-run --home "$DAILY_CURATOR_HOME"
+```
+
+`--dry-run` treats selected URLs as would-be seen, so a content run passes
+without writing `seen.txt` or `shown.jsonl`. Digest + re-show checks still
+run. `health.py check --dry-run` prints an alert if due but does not stamp
+`feed-health.json`. No real state is written. Log the brief that *would*
+push; do not deliver.
 
 ### Step 7: Deliver (a feed alert can override silence)
 Decide the final reply by precedence:

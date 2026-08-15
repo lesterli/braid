@@ -187,6 +187,46 @@ class TestVerify(unittest.TestCase):
                             verify_run.check_digest_body("# T\n<!-- _scores: q=1 -->")))
         self.assertEqual(verify_run.check_digest_body("# 今日推荐\n\nbody"), [])
 
+    def test_dry_run_skips_seen_membership(self):
+        f = verify_run.verify(["https://a/1"], _digest_ok(), set(), set(), dry_run=True)
+        self.assertEqual(f, [], "content dry run must pass when selected is not yet in seen.txt")
+
+    def test_dry_run_still_catches_reshow(self):
+        f = verify_run.verify(["https://a/1"], _digest_ok(), set(), {"https://a/1"},
+                              dry_run=True)
+        self.assertTrue(any("already seen" in x for x in f))
+
+    def test_dry_run_still_checks_digest(self):
+        f = verify_run.verify(["https://a/1"], "/nope", set(), set(), dry_run=True)
+        self.assertTrue(any("digest missing" in x for x in f))
+
+    def test_dry_run_cli_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as home:
+            selected = os.path.join(home, "selected.json")
+            digest = os.path.join(home, "tmp", "digest.md")
+            seen = os.path.join(home, "seen.txt")
+            shown = os.path.join(home, "shown.jsonl")
+            snap = os.path.join(home, "tmp", "seen-snapshot.json")
+            os.makedirs(os.path.join(home, "tmp"), exist_ok=True)
+            with open(selected, "w", encoding="utf-8") as fh:
+                json.dump({"selected": [{"url": "https://a/1"}]}, fh)
+            with open(digest, "w", encoding="utf-8") as fh:
+                fh.write("# 今日推荐\n\n**1. [x](https://a/1)**\n")
+            with open(seen, "w", encoding="utf-8"):
+                pass
+            with open(shown, "w", encoding="utf-8"):
+                pass
+            with open(snap, "w", encoding="utf-8") as fh:
+                json.dump([], fh)
+            rc = verify_run.main(["--dry-run", "--selected", selected, "--digest", digest,
+                                  "--seen", seen, "--snapshot", snap])
+            self.assertEqual(rc, 0)
+            with open(seen, encoding="utf-8") as fh:
+                self.assertEqual(fh.read(), "")
+            with open(shown, encoding="utf-8") as fh:
+                self.assertEqual(fh.read(), "")
+            self.assertFalse(os.path.exists(os.path.join(home, "digests")))
+
 
 class TestHealth(unittest.TestCase):
     def test_record_run(self):
@@ -222,6 +262,22 @@ class TestHealth(unittest.TestCase):
         stale = health.stale_feeds(data, TODAY, 14)
         due = set(health.due_for_alert(data, stale, TODAY, cadence_days=7))
         self.assertEqual(due, {"x", "z"}, "y was alerted within cadence, not due")
+
+    def test_check_dry_run_does_not_stamp(self):
+        with tempfile.TemporaryDirectory() as home:
+            data = {"feeds": {
+                "https://dead.example/feed": {
+                    "first_seen": "2020-01-01", "last_ok": "2020-01-01",
+                },
+            }, "updated": "2020-01-01"}
+            health.save_health(home, data, date(2020, 1, 1))
+            path = os.path.join(home, health.HEALTH_FILE)
+            with open(path, encoding="utf-8") as fh:
+                before = fh.read()
+            rc = health.main(["check", "--home", home, "--dry-run"])
+            self.assertEqual(rc, 0)
+            with open(path, encoding="utf-8") as fh:
+                self.assertEqual(fh.read(), before, "dry-run must not stamp last_alert")
 
 
 class TestShownAndRoundup(unittest.TestCase):

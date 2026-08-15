@@ -137,11 +137,12 @@ def cmd_check(args) -> int:
     if not due:
         print(f"[health] ok — {len(stale)} stale, none due for alert", file=sys.stderr)
         return 0
-    # rate-limit: stamp these so we don't re-alert until cadence elapses
-    stamp = today.isoformat()
-    for url in due:
-        data["feeds"].setdefault(url, {})["last_alert"] = stamp
-    save_health(home, data, today)
+    if not getattr(args, "dry_run", False):
+        # rate-limit: stamp these so we don't re-alert until cadence elapses
+        stamp = today.isoformat()
+        for url in due:
+            data["feeds"].setdefault(url, {})["last_alert"] = stamp
+        save_health(home, data, today)
     print(format_alert(due, data))  # stdout = the deliverable alert
     return 0
 
@@ -153,6 +154,8 @@ def main(argv=None) -> int:
     pc.add_argument("--home")
     pc.add_argument("--threshold", type=int, default=STALE_THRESHOLD_DAYS)
     pc.add_argument("--cadence", type=int, default=ALERT_CADENCE_DAYS)
+    pc.add_argument("--dry-run", action="store_true",
+                    help="print an alert if due but do not stamp last_alert")
     pc.set_defaults(func=cmd_check)
     args = p.parse_args(argv)
     return args.func(args)
