@@ -1,0 +1,376 @@
+# daily-curator alignment plan
+
+All 11 issues target `skills/daily-curator/`. The other skills
+(`article-to-insights`, `profile-audit`) are out of scope. This is a
+docs-and-contract alignment of an existing Python 3 stdlib skill, not a
+new app. Product name is Braid; the skill name is `daily-curator`.
+
+The skill already has the right mechanics. The work is to delete the
+leftover v2 cutover, make the docs match what the scripts actually do,
+add one first-run bootstrap and a dry-run that can verify content
+without mutating state, then rewrite `SKILL.md` around the daily path
+and lock it with a fixture harness.
+
+---
+
+## Current vs target
+
+```
+skills/daily-curator/
+  SKILL.md                         daily path only after #9/#10
+  agents/openai.yaml
+  references/
+    curated-feeds.md               bootstrap seed (already)
+    taste-template.md              0.4 floor, no Suggested-track (#8)
+    scoring-and-filtering.md       present-tense + feed-health rationale
+    output-format.md               weekly format only (daily lives in SKILL.md)
+    feed-management.md             NEW (#10)
+    weekly.md                      NEW (#10)
+  scripts/
+    canon.py                       shared primitives (URL, dates, seen.txt)
+    curate.py                      prepare / select / mark-seen / roundup
+                                   + bootstrap subcommand (#4)
+    health.py                      feed-health.json
+    verify-run.py                  + --dry-run (#6)
+    import-opml.sh
+    migrate.py                     DELETE (#2)
+    tests/test_curator.py          drop TestMigrate; keep the rest
+  evals/                           NEW (#11/#12)
+    harness.py
+    fixtures/...
+    test_scenarios.py
+```
+
+State root is `$DAILY_CURATOR_HOME` (default `~/.daily-curator`). Script
+root is the skill directory. Those two must stay distinct in every
+documented command.
+
+---
+
+## Shared types and owned files
+
+`canon.py` stays the single source of truth for URL canonicalization,
+date parsing, `state_home()`, JSONL read tolerance, and the `seen.txt`
+ledger. Do not fork those helpers into bootstrap, verify, or the eval
+harness.
+
+**User-managed**
+
+| File | Role |
+|---|---|
+| `feeds.txt` | one RSS/Atom URL per line; seeded on first run |
+| `taste.md` | LLM-read taste profile; copied from the template |
+| `negative-anchors.txt` | optional; extends built-in title regexes |
+
+**Skill-owned (create empty on demand)**
+
+| File | Role |
+|---|---|
+| `seen.txt` | JSONL `{url, date_shown}` — dedup only, 30-day prune |
+| `shown.jsonl` | JSONL shown items **including score** — weekly source |
+| `feed-health.json` | per-feed `{first_seen, last_ok, last_status, last_alert}` |
+| `digests/YYYY-MM-DD.md` | real daily digest; also the same-day idempotency key |
+| `digests/YYYY-MM-DD-weekly.md` | weekly heartbeat (distinct name) |
+| `tmp/candidates-YYYY-MM-DD.json` | `prepare` output; date = UTC today |
+| `tmp/scored.json` | agent writes this after scoring |
+| `tmp/selected.json` | `select` stdout redirected here |
+| `tmp/seen-snapshot.json` | pre-run seen set for the verifier |
+| `tmp/digest-YYYY-MM-DD.md` | dry-run digest only |
+
+`shown.jsonl` row shape (already implemented by `append_shown`):
+
+```
+{url, title, source_bucket, published, summary, score, date_shown}
+```
+
+---
+
+## Two roots, one daily pipeline
+
+```
+$SKILL_DIR                          $DAILY_CURATOR_HOME
+  scripts/curate.py                   feeds.txt  taste.md
+  scripts/verify-run.py               seen.txt   shown.jsonl
+  references/                         feed-health.json
+                                      digests/   tmp/
+```
+
+Commands always run from `$SKILL_DIR`. State paths always go through
+`--home` / `$DAILY_CURATOR_HOME`. Date in filenames is UTC today
+(`canon.today_utc()`), same clock `prepare` already uses.
+
+Daily sequence (agent judgment in brackets):
+
+```
+bootstrap → idempotency guard → prepare
+  → [score 0–1 into tmp/scored.json]
+  → select  (stdout > tmp/selected.json)
+  → [render digest]
+  → mark-seen → verify → deliver
+```
+
+Documented `select` today claims it writes `tmp/selected.json`. It does
+not — it prints JSON. Every later issue that quotes a command must
+include the redirect.
+
+---
+
+## Issue dependencies
+
+```
+#2 delete migrate.py
+ └── #3 strip v2/v3 history from docs
+      └── #4 first-run bootstrap is the only setup path
+
+#5 $SKILL_DIR + correct every documented path
+ └── #6 verifier --dry-run (content dry run must pass)
+      └── #11 isolated eval harness
+           └── #12 the required scenarios
+
+#7 document both ledgers; weekly reads shown.jsonl; scores persist there
+ └── #8 taste-template: drop Suggested-track, floor = 0.4
+
+#5 + #6 + #7 + #8  (commands and claims are now true)
+ └── #9 rewrite SKILL.md around the daily path
+      └── #10 split weekly / feeds / health into references
+```
+
+Implement in issue order 2 → 12. That already is a valid topological
+sort. Do not start #9 until the command snippets and ledger claims are
+correct, or the rewrite will bake in the old lies.
+
+`article-to-insights` and `profile-audit` are not in this graph.
+
+---
+
+## Per-issue design
+
+### #2 Delete the migration path
+
+Delete `scripts/migrate.py` and `TestMigrate` in `test_curator.py`.
+Remove the "Migration from v2" section and the migrate.py reference
+from `SKILL.md`. No replacement reference. `canon.py` currently
+mentions migrate as a consumer — drop that sentence when the import
+goes away. Do not invent a v2→v3 story anywhere else.
+
+### #3 Remove version-history prose
+
+Scope is `SKILL.md`, `output-format.md`, `scoring-and-filtering.md`
+(and any scoring wording in `taste-template.md` / `curated-feeds.md`
+that says "in v3" / "removed in" / "changed in"). Describe the current
+behavior in the present tense. No version-numbered state namespaces
+(`queued.txt` / `read.txt` as "old names"). Script docstrings and the
+User-Agent `DailyCurator/3.0` are out of this issue's file list; leave
+them unless a later doc rewrite touches them.
+
+### #4 First-run bootstrap as the only setup path
+
+Add `curate.py bootstrap` (not a second setup script). Idempotent:
+
+1. `mkdir -p $HOME/{digests,tmp}`
+2. If `feeds.txt` missing → seed URLs extracted from
+   `references/curated-feeds.md` (backtick-wrapped `http(s)://` lines
+   in the tables). If present → leave it.
+3. If `taste.md` missing → copy `references/taste-template.md`.
+   If present → leave it.
+4. If `seen.txt` / `shown.jsonl` missing → create empty files.
+5. If `feed-health.json` missing → write `{"feeds":{},"updated":""}`.
+
+A second run on an initialized install changes nothing (no rewrite,
+no re-seed). `prepare` still errors if `feeds.txt` is absent — bootstrap
+is the only way that file appears. Document the owned files in
+`SKILL.md`'s setup section, including `seen.txt`, `shown.jsonl`, and
+`feed-health.json`. Bootstrap locates the skill's `references/` relative
+to `scripts/` (`os.path.dirname` + `../references`), not via cwd.
+
+### #5 Skill directory + path corrections
+
+Introduce `$SKILL_DIR` (the directory that contains `SKILL.md`) and
+state that every command runs from there. Replace bare `scripts/...`
+with `$SKILL_DIR/scripts/...` or `cd "$SKILL_DIR" && python3 scripts/...`.
+
+Fixes that must land in the same issue:
+
+- Candidates path is `tmp/candidates-YYYY-MM-DD.json` under the state
+  home, not `candidates.json`. Date = UTC today.
+- `select` writes stdout only. Documented command includes
+  `> $HOME/tmp/selected.json`.
+- Scored input is `$HOME/tmp/scored.json` (agent-written).
+- Digest: `$HOME/digests/YYYY-MM-DD.md` live,
+  `$HOME/tmp/digest-YYYY-MM-DD.md` dry-run.
+- Snapshot: `$HOME/tmp/seen-snapshot.json`.
+- `roundup` reads `shown.jsonl` (full correction of the weekly *source*
+  is #7; this issue only has to stop documenting a path the script
+  does not read).
+
+Walk every remaining path in `SKILL.md` against `curate.py` /
+`verify-run.py` / `health.py` and fix mismatches.
+
+### #6 Safe content-bearing dry run
+
+Today a content dry run skips `mark-seen` then runs `verify-run.py`,
+which fails because selected URLs are not in `seen.txt`.
+
+Add `--dry-run` to `verify-run.py`:
+
+- Still require a non-empty digest that starts at an H1 and has no
+  YAML / `_scores` leak.
+- Still fail if a selected URL is in the pre-run snapshot (would
+  re-show).
+- Treat selected URLs as *would-be* seen, so the "must be in seen.txt"
+  check passes without writing `seen.txt` or `shown.jsonl`.
+- Write nothing. Exit 0 on a clean content dry run.
+
+Document the exact command. Guarantee: dry-run writes only under
+`$HOME/tmp/` (the shadow digest). It does not create
+`digests/<today>.md`, does not append `seen.txt`, does not append
+`shown.jsonl`.
+
+`health.py check` currently stamps `last_alert`. If a dry-run is
+supposed to leave *all* real state untouched, add `--dry-run` there
+too (print the alert, skip the stamp). Include that in this issue if
+the documented dry-run still calls `health.py check`.
+
+### #7 Ledger, weekly source, score persistence
+
+Three factual corrections, no behavior change:
+
+1. Frontmatter / inputs: `seen.txt` is the **dedup** ledger;
+   `shown.jsonl` is the **shown-item** ledger. Both persist.
+2. Weekly workflow reads `shown.jsonl` via `curate.py roundup`, not
+   `digests/*.md`.
+3. Scores **are** persisted on `shown.jsonl` so weekly ranking is
+   deterministic. The digest itself stays human-only (no hidden
+   `_scores`). Scoring docs that say "no persisted scores" are wrong.
+
+### #8 Taste template ↔ scoring
+
+`taste.md` is LLM-read; `select` only consumes a numeric `score`.
+Align the template with `scoring-and-filtering.md` and
+`DEFAULT_FLOOR = 0.4`:
+
+- Delete the Suggested-track table (`gongzhonghao` / `xiaohongshu` /
+  `deep-read` / `skip`) — leftover publisher tracks.
+- Change the hard floor from `<0.3` to `<0.4`.
+- Keep primary / secondary / tertiary axes and positive / negative
+  anchors; those are what the scoring prompt actually uses.
+
+### #9 Rewrite SKILL.md around the daily path
+
+After the claims are true, restructure `SKILL.md` to:
+
+1. Frontmatter: activation + scope, including feed-management
+   triggers if they stay supported.
+2. **Critical gotchas**: run from `$SKILL_DIR`; never deliver before
+   `verify-run.py` exits 0; a content dry run must not mutate real
+   state; weekly reads `shown.jsonl`, not digest prose.
+3. Daily checklist, in this order: bootstrap → idempotency →
+   prepare → score → select → render → persist → verify → deliver.
+4. Exact command snippets with the paths from #5/#6.
+5. Daily digest template inline (H1, numbered Markdown links, Source
+   line, one concrete why-line).
+
+Drop instructions a capable agent already knows. Do not keep a
+generic References inventory.
+
+### #10 Targeted references + conditional loading
+
+Move out of `SKILL.md`:
+
+- Conversational feed add/remove/list/OPML → `references/feed-management.md`
+- Weekly heartbeat, `roundup`, zero-item `本周无新增。` → `references/weekly.md`
+- Feed-health rationale (backlog = health, 14-day stale, weekly
+  rate-limit) → `scoring-and-filtering.md`
+
+Conditional loads, phrased as triggers:
+
+- Before scoring → read `scoring-and-filtering.md`
+- Rendering weekly output → read `weekly.md` + `output-format.md`
+- User is managing feeds → read `feed-management.md`
+- First run / missing taste → read `taste-template.md`
+
+Nothing the daily path needs may live only in a reference. There is
+no migration reference.
+
+### #11 Evaluation harness
+
+New `skills/daily-curator/evals/` (not under the user's
+`~/.daily-curator`). Harness rules:
+
+- Every scenario gets a fresh `tempfile.TemporaryDirectory` as
+  `--home` / `DAILY_CURATOR_HOME`.
+- Feed bodies are `file://` fixtures. No network.
+- Taste, `seen.txt`, `shown.jsonl`, and scored JSON are fixtures.
+- Helper: run `curate.py` / `verify-run.py` / `health.py` as
+  subprocesses from `$SKILL_DIR`, same as a real agent.
+- Assert both the observable output and which state files changed.
+
+Document `python3 -m unittest` from `evals/` (or a one-line
+`evals/README.md`). Reuse `canon.state_home` / `canonicalize_url`;
+do not reimplement them.
+
+### #12 Required scenarios
+
+Each asserts outcome + "state changed only where intended":
+
+| Scenario | Observable | State |
+|---|---|---|
+| First-run bootstrap | feeds + taste created | empty ledgers appear; second run is a no-op |
+| Normal content day | digest rendered, verify 0 | `seen.txt` + `shown.jsonl` grow; digest written |
+| Silent day | empty `select`, `[SILENT]` | no digest, ledgers unchanged |
+| Dry run with selected items | verify `--dry-run` exits 0 | no `seen.txt` / `shown.jsonl` / `digests/` write |
+| Same-day re-invoke | existing `digests/<today>.md` → stop | no second mark-seen |
+| Missing / invalid taste | bootstrap or score path surfaces it | no crash, no silent scoring |
+| Malformed scored JSON | `select` yields `[]` via `unwrap_list` | no state write |
+| Weekly roundup | items from `shown.jsonl`, score-ranked | writes `*-weekly.md` only |
+| Zero-item weekly | `本周无新增。` (not `[SILENT]`) | no daily digest created |
+| Feed-management triggers | 关注 / 取消关注 / 我的信源 / 导入 OPML / 调整口味 | only `feeds.txt` or `taste.md` |
+| Trigger false positives | "今日推荐", article URLs in a digest, etc. | must **not** edit feeds |
+
+Agent-only checks (idempotency guard, trigger phrases, `[SILENT]` /
+`本周无新增。` wording) are fixture + contract tests against
+`SKILL.md` / the new references, plus the mechanical steps the
+scripts can actually run. Do not require a live LLM.
+
+---
+
+## Key decisions
+
+1. **Stdlib only.** No new dependencies. Existing `unittest` suite
+   stays; evals use the same runner.
+2. **Bootstrap is a `curate.py` subcommand**, not a second entry
+   point and not "the agent copies files by hand". Idempotent, and
+   the only setup path.
+3. **Two ledgers, two jobs.** `seen.txt` = "have I shown this URL?"
+   `shown.jsonl` = "what did I show, with score, for the weekly
+   roundup?" Docs that call `seen.txt` the only persistent ledger
+   are wrong.
+4. **`select` is stdout-only.** The agent redirects. Do not change
+   the script to write a file — that would surprise the existing
+   e2e test and any wrapper that already captures stdout.
+5. **Dry-run safety lives in the verifier**, not in a fake
+   `mark-seen`. Real ledgers stay untouched.
+6. **UTC today** is the only date used in filenames and
+   `date_shown`. Document that; do not switch to local time.
+7. **Daily template inline, weekly format in a reference.** The
+   daily path must work with `SKILL.md` alone.
+8. **Present tense, no version history.** After #2/#3 the skill has
+   one behavior. Do not leave a cutover playbook.
+9. **Evals never touch a real install.** Isolated temp home +
+   `file://` feeds.
+
+---
+
+## Implementation order (later sessions, one issue each)
+
+1. #2 delete migrate
+2. #3 strip history
+3. #4 bootstrap
+4. #5 paths
+5. #6 dry-run verify
+6. #7 ledger/weekly/score claims
+7. #8 taste template
+8. #9 SKILL.md rewrite
+9. #10 reference split
+10. #11 harness
+11. #12 scenarios
