@@ -87,3 +87,16 @@ slow monthly/quarterly sources are not disadvantaged once they publish.
   **including `score`**, which `roundup` uses to rank the weekly brief.
 - Scores **are** persisted on `shown.jsonl` for weekly ranking. They do not
   appear in the human digest (no hidden `_scores` comments).
+
+## Feed health
+
+`prepare` writes `$DAILY_CURATOR_HOME/feed-health.json`. A working feed always
+returns its backlog, so "returned ≥1 parseable entry" is a health signal
+independent of publish cadence: a monthly blog stays ok every day; only a
+feed that 404s, errors, or returns nothing trends stale. (hnrss query feeds
+can legitimately be empty on a quiet week, so the threshold is 14 days.)
+
+`python3 "$SKILL_DIR/scripts/health.py" check` flags feeds with no parseable
+entry for >14 days and prints an out-of-band alert (deliver even on a silent
+day). Alerts are rate-limited to once a week per feed (`last_alert`).
+`--dry-run` prints the alert but does not stamp `last_alert`.
