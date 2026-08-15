@@ -14,9 +14,12 @@ Checks (exit 1 on any failure, 0 if clean):
     - no shown URL was already in seen BEFORE the run (didn't re-show a seen item)
   silent runs (selected empty): nothing to verify; a [SILENT] day is valid.
 
-Usage:
-  verify-run.py --selected selected.json --digest digests/<date>.md \\
-                --seen ~/.daily-curator/seen.txt --snapshot tmp/seen-snapshot.json
+Usage (run from $SKILL_DIR; state paths are under $DAILY_CURATOR_HOME):
+  python3 "$SKILL_DIR/scripts/verify-run.py" \\
+      --selected "$DAILY_CURATOR_HOME/tmp/selected.json" \\
+      --digest "$DAILY_CURATOR_HOME/digests/YYYY-MM-DD.md" \\
+      --seen "$DAILY_CURATOR_HOME/seen.txt" \\
+      --snapshot "$DAILY_CURATOR_HOME/tmp/seen-snapshot.json"
 """
 from __future__ import annotations
 

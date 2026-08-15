@@ -55,6 +55,6 @@ Common user actions — all persisted to `feeds.txt`:
 
 - "关注 https://example.com/feed.xml" → append URL
 - "取消关注 example.com" → remove matching line
-- "导入 OPML https://..." → extract all feed URLs via `scripts/import-opml.sh` and append
+- "导入 OPML https://..." → extract all feed URLs via `bash "$SKILL_DIR/scripts/import-opml.sh"` and append
 
 If `feeds.txt` is missing, run `curate.py bootstrap` — that is the only setup path. "关注" and OPML import then append to the existing file.

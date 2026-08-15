@@ -16,24 +16,27 @@ has one correct answer, so it never gets re-improvised per run.
     drop title ~ negative-anchor regex    [stage-1 grep]
        │
        ▼
-    candidates.json  ──▶  [LLM scores each 0–1]  ──▶  scored.json
+    tmp/candidates-YYYY-MM-DD.json  ──▶  [LLM scores]  ──▶  tmp/scored.json
                                                           │
-                                                          ▼  select (NO LLM):
+                                                          ▼  select (stdout only):
                                               drop score < floor(0.4)
                                               rank: score desc, newer first
                                               same-source cap = 2
                                               take top N (default 5)
                                                           │
                                                           ▼
-                                              selected.json ─▶ [LLM writes digest]
+                         tmp/selected.json (redirect stdout) ─▶ [LLM writes digest]
                                                           │
                                                           ▼  mark-seen
                                               append shown URLs to seen.txt
 
+Run commands from $SKILL_DIR (the directory that contains SKILL.md).
+Date in candidates-YYYY-MM-DD.json is UTC today (canon.today_utc()).
+
 Subcommands:
   bootstrap  first-run setup: seed feeds/taste, create empty state (idempotent)
-  prepare    fetch + filter + dedup; prune seen; snapshot seen; write candidates
-  select     scored.json -> selected.json (floor, rank, same-source cap, top-N)
+  prepare    fetch + filter + dedup; write tmp/candidates-YYYY-MM-DD.json
+  select     --scored FILE -> selected JSON on stdout (redirect to tmp/selected.json)
   mark-seen  append selected URLs to seen.txt (call only after a real delivery)
 
 State dir defaults to $DAILY_CURATOR_HOME or ~/.daily-curator.
@@ -538,7 +541,7 @@ def cmd_roundup(args) -> int:
            "count": len(items), "items": items}
     json.dump(out, sys.stdout, ensure_ascii=False, indent=2)
     print()
-    print(f"[roundup] {len(items)} item(s) from the last {args.days} day(s) of digests",
+    print(f"[roundup] {len(items)} item(s) from the last {args.days} day(s) of shown.jsonl",
           file=sys.stderr)
     return 0
 
@@ -552,14 +555,16 @@ def main(argv=None) -> int:
     pb.add_argument("--home")
     pb.set_defaults(func=cmd_bootstrap)
 
-    pp = sub.add_parser("prepare", help="fetch + filter + dedup -> candidates.json")
+    pp = sub.add_parser("prepare",
+                        help="fetch + filter + dedup -> tmp/candidates-YYYY-MM-DD.json")
     pp.add_argument("--home")
     pp.add_argument("--feeds")
     pp.add_argument("--window", type=int, default=FRESHNESS_WINDOW_DAYS)
     pp.add_argument("--seen-window", type=int, default=30)
     pp.set_defaults(func=cmd_prepare)
 
-    ps = sub.add_parser("select", help="scored.json -> selected.json")
+    ps = sub.add_parser("select",
+                        help="scored JSON file -> selected JSON on stdout (redirect)")
     ps.add_argument("--scored", required=True)
     ps.add_argument("--count", type=int, default=DEFAULT_COUNT)
     ps.add_argument("--floor", type=float, default=DEFAULT_FLOOR)
@@ -571,7 +576,7 @@ def main(argv=None) -> int:
     pm.add_argument("--home")
     pm.set_defaults(func=cmd_mark_seen)
 
-    pr = sub.add_parser("roundup", help="collect items from the last N daily digests")
+    pr = sub.add_parser("roundup", help="collect items from shown.jsonl for the last N days")
     pr.add_argument("--days", type=int, default=7)
     pr.add_argument("--home")
     pr.set_defaults(func=cmd_roundup)

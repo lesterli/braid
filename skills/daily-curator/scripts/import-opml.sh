@@ -2,10 +2,10 @@
 #
 # import-opml.sh — Extract feed URLs from an OPML file
 #
-# Usage:
-#   bash import-opml.sh feeds.opml
-#   bash import-opml.sh https://example.com/feeds.opml
-#   curl -sL https://example.com/feeds.opml | bash import-opml.sh
+# Usage (from $SKILL_DIR, or pass the full script path):
+#   bash "$SKILL_DIR/scripts/import-opml.sh" feeds.opml
+#   bash "$SKILL_DIR/scripts/import-opml.sh" https://example.com/feeds.opml
+#   curl -sL https://example.com/feeds.opml | bash "$SKILL_DIR/scripts/import-opml.sh"
 #
 # Output: One feed URL per line (append to ~/.daily-curator/feeds.txt;
 #         curate.py prepare fetches them on the next run)

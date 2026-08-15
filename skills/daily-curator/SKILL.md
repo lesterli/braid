@@ -16,20 +16,34 @@ description: >-
 A short reading brief. The skill is split into two halves:
 
 - **Mechanics (deterministic, shipped scripts — never improvise these).**
-  `scripts/curate.py` fetches, canonicalizes URLs, dedups against `seen.txt`,
-  drops stale + negative-anchor items, then selects the top picks.
-  `verify-run.py` handles pre-delivery checks. Run them, do not re-author them.
+  `$SKILL_DIR/scripts/curate.py` fetches, canonicalizes URLs, dedups against
+  `seen.txt`, drops stale + negative-anchor items, then selects the top picks.
+  `$SKILL_DIR/scripts/verify-run.py` handles pre-delivery checks. Run them, do
+  not re-author them.
 - **Judgment (yours).** Between `prepare` and `select`, you score each candidate
   0–1 against `taste.md` and later write the one-line "why it matters". That is
   the only part that needs a model.
 
 ```
-prepare (script) ──▶ candidates.json ──▶ [you score 0–1] ──▶ scored.json
-                                                                  │
-                          selected.json ◀── select (script) ◀─────┘
+prepare ──▶ tmp/candidates-YYYY-MM-DD.json ──▶ [you score 0–1] ──▶ tmp/scored.json
+                                                                              │
+              tmp/selected.json ◀── select (stdout, redirect) ◀───────────────┘
                                 │
-            [you write the digest prose] ──▶ mark-seen (script) ──▶ verify (script) ──▶ deliver
+            [you write the digest prose] ──▶ mark-seen ──▶ verify ──▶ deliver
 ```
+
+## Paths
+
+All commands run from `$SKILL_DIR` — the directory that contains this `SKILL.md`.
+Never invoke a bare relative `scripts/...` path from another working directory.
+
+| Variable | Meaning |
+|---|---|
+| `$SKILL_DIR` | This skill directory (contains `SKILL.md` and `scripts/`) |
+| `$DAILY_CURATOR_HOME` | State directory. Defaults to `~/.daily-curator` (override with the `$DAILY_CURATOR_HOME` env var or `--home`). |
+
+Dates in working filenames are **UTC today** as `YYYY-MM-DD` — the same clock
+`prepare` uses (`canon.today_utc()`). Example: `tmp/candidates-2026-08-15.json`.
 
 Most positive-anchor sources publish weekly or slower, so on many days there is
 nothing genuinely new. The skill stays **silent** rather than padding. An item
@@ -52,9 +66,9 @@ make the cut isn't recorded, so it re-competes tomorrow while still inside the
 
 | File | Purpose |
 |---|---|
-| `~/.daily-curator/feeds.txt` | Personal RSS/Atom feed list (seeded by bootstrap) |
-| `~/.daily-curator/taste.md` | Taste profile: axes + positive/negative anchors (copied from the template by bootstrap) |
-| `~/.daily-curator/negative-anchors.txt` | Optional: one regex per line; **extends** the built-in title pre-filter (does not replace it) |
+| `$DAILY_CURATOR_HOME/feeds.txt` | Personal RSS/Atom feed list (seeded by bootstrap) |
+| `$DAILY_CURATOR_HOME/taste.md` | Taste profile: axes + positive/negative anchors (copied from the template by bootstrap) |
+| `$DAILY_CURATOR_HOME/negative-anchors.txt` | Optional: one regex per line; **extends** the built-in title pre-filter (does not replace it) |
 
 ## Skill-owned state
 
@@ -62,17 +76,22 @@ Created empty on first bootstrap; later runs fill them in. Do not seed these by 
 
 | File | Purpose |
 |---|---|
-| `~/.daily-curator/seen.txt` | JSONL dedup ledger of shown URLs (auto-pruned to 30d) |
-| `~/.daily-curator/shown.jsonl` | JSONL ledger of shown items |
-| `~/.daily-curator/feed-health.json` | Per-feed fetch health |
-| `~/.daily-curator/digests/YYYY-MM-DD.md` | Per-run daily output |
+| `$DAILY_CURATOR_HOME/seen.txt` | JSONL dedup ledger of shown URLs (auto-pruned to 30d) |
+| `$DAILY_CURATOR_HOME/shown.jsonl` | JSONL ledger of shown items |
+| `$DAILY_CURATOR_HOME/feed-health.json` | Per-feed fetch health |
+| `$DAILY_CURATOR_HOME/digests/YYYY-MM-DD.md` | Daily digest (UTC date) |
+| `$DAILY_CURATOR_HOME/tmp/candidates-YYYY-MM-DD.json` | `prepare` output (UTC date) |
+| `$DAILY_CURATOR_HOME/tmp/scored.json` | Agent-written scores (same shape as the prepare output) |
+| `$DAILY_CURATOR_HOME/tmp/selected.json` | `select` stdout redirected here |
+| `$DAILY_CURATOR_HOME/tmp/seen-snapshot.json` | Pre-run `seen.txt` snapshot for the verifier |
+| `$DAILY_CURATOR_HOME/tmp/digest-YYYY-MM-DD.md` | Dry-run digest only |
 
 Conversational feed management (all persist to `feeds.txt`):
 
 - "关注 https://example.com/feed.xml" → append to `feeds.txt`
 - "取消关注 example.com" → remove matching line
 - "我的信源" / "list feeds" → show `feeds.txt`
-- "导入 OPML https://..." → run `scripts/import-opml.sh`, append URLs
+- "导入 OPML https://..." → run `bash "$SKILL_DIR/scripts/import-opml.sh"`, append URLs
 - "调整口味" / "edit taste" → show `taste.md`, accept edits
 
 (Delivery is one-way, so read state isn't tracked. `seen.txt` only answers
@@ -82,9 +101,9 @@ Conversational feed management (all persist to `feeds.txt`):
 
 ### Step 0: Bootstrap (the only setup path)
 ```bash
-python3 scripts/curate.py bootstrap
+python3 "$SKILL_DIR/scripts/curate.py" bootstrap --home "$DAILY_CURATOR_HOME"
 ```
-Creates `~/.daily-curator` (plus `digests/` and `tmp/`) if needed. Seeds
+Creates `$DAILY_CURATOR_HOME` (plus `digests/` and `tmp/`) if needed. Seeds
 `feeds.txt` from [references/curated-feeds.md](./references/curated-feeds.md)
 and `taste.md` from [references/taste-template.md](./references/taste-template.md)
 when those files are missing, and initializes empty `seen.txt`, `shown.jsonl`,
@@ -94,23 +113,25 @@ is meaningless). Do not mkdir or copy these files by hand — this command is
 the only setup path.
 
 ### Step 1: Idempotency guard
-If `~/.daily-curator/digests/<today>.md` already exists and `force_regen` is
-false → today already ran. Respond `[SILENT]` and stop. This prevents a retry or
-manual re-run from pushing a second, different brief to a one-way channel.
+If `$DAILY_CURATOR_HOME/digests/YYYY-MM-DD.md` already exists (UTC today) and
+`force_regen` is false → today already ran. Respond `[SILENT]` and stop. This
+prevents a retry or manual re-run from pushing a second, different brief to a
+one-way channel.
 
 ### Step 2: Prepare candidates (deterministic)
 ```bash
-python3 scripts/curate.py prepare
+python3 "$SKILL_DIR/scripts/curate.py" prepare --home "$DAILY_CURATOR_HOME"
 ```
 This prunes `seen.txt` to 30 days, snapshots it, fetches every feed, parses
 RSS/Atom, canonicalizes URLs, and drops: items published >14d ago, URLs already
 in `seen.txt`, and titles matching the negative-anchor pre-filter. It writes
-`tmp/candidates-<today>.json` (also printed to stdout) with the survivors.
+`$DAILY_CURATOR_HOME/tmp/candidates-YYYY-MM-DD.json` (also printed to stdout)
+where `YYYY-MM-DD` is UTC today.
 
 ### Step 3: Score candidates (your judgment)
 Read `taste.md`. For each candidate, assign `score` ∈ [0,1] for relevance to the
 user's taste, then write the candidates back with a `score` field as
-`tmp/scored.json` (same shape as candidates.json).
+`$DAILY_CURATOR_HOME/tmp/scored.json` (same wrapper shape as the prepare file).
 
 Score by **relative ranking, anchored to taste.md**, not by guessing an absolute
 number in a vacuum (an unanchored score collapses to a constant):
@@ -125,20 +146,23 @@ See [references/scoring-and-filtering.md](./references/scoring-and-filtering.md)
 
 ### Step 4: Select (deterministic)
 ```bash
-python3 scripts/curate.py select --scored tmp/scored.json
+python3 "$SKILL_DIR/scripts/curate.py" select \
+    --scored "$DAILY_CURATOR_HOME/tmp/scored.json" \
+    > "$DAILY_CURATOR_HOME/tmp/selected.json"
 ```
 Applies the floor (default **0.4** — the [SILENT] gate), ranks by score then
 recency, enforces a **same-source cap of 2** (all `hnrss.org/*` share one
-bucket), and takes the top `count`. Writes `tmp/selected.json`. Items below the
-floor or beyond the cap are simply not selected — they are NOT recorded, so they
-re-compete next run.
+bucket), and takes the top `count`. Prints selected JSON to **stdout only** —
+the redirect above is required; the script does not write a file. Items below
+the floor or beyond the cap are simply not selected — they are NOT recorded, so
+they re-compete next run.
 
 ### Step 5: Write the digest (only if there is content)
 If `selected` is non-empty, write the digest as clean human Markdown, starting at
 an H1, **no YAML frontmatter and no hidden score comments**. Path:
-`~/.daily-curator/digests/<today>.md` on a normal run, but
-**`tmp/digest-<today>.md` when `dry_run`** — so a shadow run never creates the
-real file the Step 1 guard keys on. One item per pick:
+`$DAILY_CURATOR_HOME/digests/YYYY-MM-DD.md` on a normal run (UTC today), but
+**`$DAILY_CURATOR_HOME/tmp/digest-YYYY-MM-DD.md` when `dry_run`** — so a shadow
+run never creates the real file the Step 1 guard keys on. One item per pick:
 ```
 **1. [Title](https://canonical-url)**
 Source: <Source> · <Nd ago>
@@ -148,10 +172,15 @@ Source: <Source> · <Nd ago>
 ### Step 6: Persist + verify (deterministic)
 Let `<digest>` be the path written in Step 5. On a normal run:
 ```bash
-python3 scripts/curate.py mark-seen --selected tmp/selected.json
-python3 scripts/verify-run.py --selected tmp/selected.json --digest <digest> \
-    --seen ~/.daily-curator/seen.txt --snapshot tmp/seen-snapshot.json
-python3 scripts/health.py check   # prints a stale-feed alert (or nothing) — see Step 7
+python3 "$SKILL_DIR/scripts/curate.py" mark-seen \
+    --selected "$DAILY_CURATOR_HOME/tmp/selected.json" \
+    --home "$DAILY_CURATOR_HOME"
+python3 "$SKILL_DIR/scripts/verify-run.py" \
+    --selected "$DAILY_CURATOR_HOME/tmp/selected.json" \
+    --digest "$DAILY_CURATOR_HOME/digests/YYYY-MM-DD.md" \
+    --seen "$DAILY_CURATOR_HOME/seen.txt" \
+    --snapshot "$DAILY_CURATOR_HOME/tmp/seen-snapshot.json"
+python3 "$SKILL_DIR/scripts/health.py" check --home "$DAILY_CURATOR_HOME"
 ```
 If `verify-run.py` exits non-zero, do NOT deliver — report the failure instead.
 In `dry_run`: skip `mark-seen` (state stays untouched), still run `verify-run` and
@@ -172,21 +201,22 @@ nothing — just log what would have been sent.
 The weekly run is the **heartbeat**: it always delivers, so the channel never
 goes dark for a week (and a 7-day silence then means something is broken).
 ```bash
-python3 scripts/curate.py roundup --days 7   # items from the last 7 daily digests
+python3 "$SKILL_DIR/scripts/curate.py" roundup --days 7 --home "$DAILY_CURATOR_HOME"
 ```
-`roundup` returns the week's shown items ranked best-first (by score). Pick the
-3–5 strongest — no new scoring — and write a short "本周精选" brief in the weekly
-format (see [references/output-format.md](./references/output-format.md)). Write it
-to `~/.daily-curator/digests/<today>-weekly.md` (a distinct name so it never
-collides with the daily file or the daily idempotency guard). If the week produced
-nothing, send a one-line "本周无新增。" rather than `[SILENT]`.
+`roundup` reads `$DAILY_CURATOR_HOME/shown.jsonl` and prints the week's shown
+items ranked best-first (by score) to stdout. Pick the 3–5 strongest — no new
+scoring — and write a short "本周精选" brief in the weekly format (see
+[references/output-format.md](./references/output-format.md)). Write it to
+`$DAILY_CURATOR_HOME/digests/YYYY-MM-DD-weekly.md` (UTC today; a distinct name
+so it never collides with the daily file or the daily idempotency guard). If the
+week produced nothing, send a one-line "本周无新增。" rather than `[SILENT]`.
 
 Note: this heartbeat only holds once the Sunday `mode=weekly` cron entry is
 installed; nothing else triggers the weekly run.
 
 ## Feed health
 `curate.py prepare` records each feed's fetch outcome to `feed-health.json`.
-`scripts/health.py check` flags any feed that has returned no parseable entry for
+`python3 "$SKILL_DIR/scripts/health.py" check` flags any feed that has returned no parseable entry for
 > 14 days and emits an out-of-band alert (delivered even on silent days — see
 Step 7), rate-limited to once a week per feed. This is cadence-aware *without*
 modeling cadence: a healthy feed always serves its backlog, so a monthly
