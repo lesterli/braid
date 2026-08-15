@@ -76,11 +76,12 @@ slow monthly/quarterly sources are not disadvantaged once they publish.
 
 ## Overflow & state
 
-- Items below the floor or beyond the cap are **not** recorded in `seen.txt`, so
-  they re-compete next run while still inside the 14-day window. This rollover is
-  best-effort: an item that rolls off its RSS feed before being shown is gone
-  (fine — this is a brief, not a never-miss archive).
-- Only **shown** items are appended to `seen.txt`. It is pruned to a 30-day
-  rolling window each run (an item older than the freshness window can never
-  resurface, so older rows are dead weight).
-- No scores are persisted. Nothing downstream consumes them.
+- Items below the floor or beyond the cap are **not** recorded in `seen.txt` or
+  `shown.jsonl`, so they re-compete next run while still inside the 14-day
+  window. This rollover is best-effort: an item that rolls off its RSS feed
+  before being shown is gone (fine — this is a brief, not a never-miss archive).
+- Only **shown** items are appended to both ledgers. `seen.txt` is the dedup
+  key (pruned to 30 days each run). `shown.jsonl` stores the structured row
+  **including `score`**, which `roundup` uses to rank the weekly brief.
+- Scores **are** persisted on `shown.jsonl` for weekly ranking. They do not
+  appear in the human digest (no hidden `_scores` comments).

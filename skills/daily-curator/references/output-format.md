@@ -9,7 +9,7 @@ chat reply are identical, starting at the H1.
 `~/.daily-curator/digests/YYYY-MM-DD.md`. The same-day idempotency guard means a
 real re-run does NOT overwrite-and-re-push; it stays `[SILENT]` (use
 `force_regen` to deliberately regenerate). In `dry_run`, write under `tmp/`
-instead so the guard and `seen.txt` stay untouched.
+instead so the guard, `seen.txt`, and `shown.jsonl` stay untouched.
 
 ## Daily digest format
 
@@ -47,8 +47,9 @@ Respond with exactly `[SILENT]` so the cron suppresses delivery.
 
 ## Weekly roundup (mode=weekly, Sundays)
 
-The Sunday run always delivers (it is the heartbeat). Read the last 7 days of
-`digests/*.md`, pick the 3–5 strongest items, and write:
+The Sunday run always delivers (it is the heartbeat). `curate.py roundup`
+reads `shown.jsonl` (not daily digest files), ranks by the persisted score,
+and you pick the 3–5 strongest items and write:
 
 ```markdown
 # 本周精选 | YYYY-MM-DD
