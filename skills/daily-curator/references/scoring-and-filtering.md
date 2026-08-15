@@ -29,9 +29,11 @@ Applied in order; survivors become the candidate set:
 
 ## Relevance score (your judgment, 0–1)
 
-Read `taste.md`. Score each candidate for relevance to the user's taste by
-**relative ranking anchored to examples**, not an absolute guess (an unanchored
-absolute score collapses to a constant):
+Read `taste.md` (primary / secondary / tertiary axes, positive anchors,
+negative anchors — no track tags). Score each candidate for relevance to the
+user's taste by **relative ranking anchored to examples**, not an absolute
+guess (an unanchored absolute score collapses to a constant). Write a numeric
+`score` field; that is the only taste signal `select` reads:
 
 1. Anchor first. Pick 2–3 reference points from `taste.md`:
    primary-axis + positive-anchor ≈ **0.9**, borderline tertiary ≈ **0.5**,
