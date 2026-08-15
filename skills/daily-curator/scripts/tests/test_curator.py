@@ -252,6 +252,70 @@ class TestShownAndRoundup(unittest.TestCase):
             self.assertEqual(len(got), 1)
 
 
+class TestBootstrap(unittest.TestCase):
+    def test_extract_feed_urls(self):
+        md = (
+            "see `https://a.example/feed` and `https://b.example/atom`\n"
+            "dup `https://a.example/feed`\n"
+            "no scheme `hnrss.org/best`\n"
+        )
+        self.assertEqual(curate.extract_feed_urls(md),
+                         ["https://a.example/feed", "https://b.example/atom"])
+
+    def test_first_run_seeds_and_inits_state(self):
+        with tempfile.TemporaryDirectory() as home:
+            rc = curate.main(["bootstrap", "--home", home])
+            self.assertEqual(rc, 0)
+            feeds = os.path.join(home, "feeds.txt")
+            taste = os.path.join(home, "taste.md")
+            seen = os.path.join(home, "seen.txt")
+            shown = os.path.join(home, "shown.jsonl")
+            health_path = os.path.join(home, "feed-health.json")
+            self.assertTrue(os.path.isdir(os.path.join(home, "digests")))
+            self.assertTrue(os.path.isdir(os.path.join(home, "tmp")))
+            with open(feeds, encoding="utf-8") as fh:
+                urls = [ln.strip() for ln in fh if ln.strip()]
+            self.assertGreaterEqual(len(urls), 20)
+            self.assertTrue(all(u.startswith(("http://", "https://")) for u in urls))
+            with open(taste, encoding="utf-8") as fh:
+                taste_body = fh.read()
+            template = os.path.join(curate.skill_dir(), "references", "taste-template.md")
+            with open(template, encoding="utf-8") as fh:
+                self.assertEqual(taste_body, fh.read())
+            self.assertEqual(os.path.getsize(seen), 0)
+            self.assertEqual(os.path.getsize(shown), 0)
+            with open(health_path, encoding="utf-8") as fh:
+                self.assertEqual(json.load(fh), {"feeds": {}, "updated": ""})
+
+    def test_second_run_changes_nothing(self):
+        with tempfile.TemporaryDirectory() as home:
+            self.assertEqual(curate.main(["bootstrap", "--home", home]), 0)
+            feeds = os.path.join(home, "feeds.txt")
+            taste = os.path.join(home, "taste.md")
+            seen = os.path.join(home, "seen.txt")
+            shown = os.path.join(home, "shown.jsonl")
+            health_path = os.path.join(home, "feed-health.json")
+            with open(feeds, "w", encoding="utf-8") as fh:
+                fh.write("https://custom.example/feed.xml\n")
+            with open(taste, "w", encoding="utf-8") as fh:
+                fh.write("# my taste\n")
+            with open(seen, "w", encoding="utf-8") as fh:
+                fh.write('{"url":"https://x/1","date_shown":"2026-06-23"}\n')
+            with open(shown, "w", encoding="utf-8") as fh:
+                fh.write('{"url":"https://x/1","score":0.9}\n')
+            with open(health_path, "w", encoding="utf-8") as fh:
+                json.dump({"feeds": {"https://x": {"last_ok": "2026-06-23"}},
+                           "updated": "2026-06-23"}, fh)
+            before = {}
+            for p in (feeds, taste, seen, shown, health_path):
+                with open(p, encoding="utf-8") as fh:
+                    before[p] = fh.read()
+            self.assertEqual(curate.main(["bootstrap", "--home", home]), 0)
+            for p, content in before.items():
+                with open(p, encoding="utf-8") as fh:
+                    self.assertEqual(fh.read(), content, f"{os.path.basename(p)} rewritten")
+
+
 class TestReviewFixes(unittest.TestCase):
     def test_canonical_default_ports(self):
         self.assertEqual(canon.canonicalize_url("http://ex.com:80/a"), "http://ex.com/a")

@@ -52,11 +52,20 @@ make the cut isn't recorded, so it re-competes tomorrow while still inside the
 
 | File | Purpose |
 |---|---|
-| `~/.daily-curator/feeds.txt` | Personal RSS/Atom feed list |
-| `~/.daily-curator/taste.md` | Taste profile: axes + positive/negative anchors |
-| `~/.daily-curator/seen.txt` | JSONL ledger of shown URLs (dedup only; auto-pruned to 30d) |
+| `~/.daily-curator/feeds.txt` | Personal RSS/Atom feed list (seeded by bootstrap) |
+| `~/.daily-curator/taste.md` | Taste profile: axes + positive/negative anchors (copied from the template by bootstrap) |
 | `~/.daily-curator/negative-anchors.txt` | Optional: one regex per line; **extends** the built-in title pre-filter (does not replace it) |
-| `~/.daily-curator/digests/YYYY-MM-DD.md` | Per-run output |
+
+## Skill-owned state
+
+Created empty on first bootstrap; later runs fill them in. Do not seed these by hand.
+
+| File | Purpose |
+|---|---|
+| `~/.daily-curator/seen.txt` | JSONL dedup ledger of shown URLs (auto-pruned to 30d) |
+| `~/.daily-curator/shown.jsonl` | JSONL ledger of shown items |
+| `~/.daily-curator/feed-health.json` | Per-feed fetch health |
+| `~/.daily-curator/digests/YYYY-MM-DD.md` | Per-run daily output |
 
 Conversational feed management (all persist to `feeds.txt`):
 
@@ -71,14 +80,18 @@ Conversational feed management (all persist to `feeds.txt`):
 
 ## Workflow (daily)
 
-### Step 0: Bootstrap (first run only)
+### Step 0: Bootstrap (the only setup path)
 ```bash
-mkdir -p ~/.daily-curator/digests
+python3 scripts/curate.py bootstrap
 ```
-If `feeds.txt` is missing → seed from
-[references/curated-feeds.md](./references/curated-feeds.md). If `taste.md` is
-missing → copy [references/taste-template.md](./references/taste-template.md)
-and tell the user to edit it (without it, scoring is meaningless).
+Creates `~/.daily-curator` (plus `digests/` and `tmp/`) if needed. Seeds
+`feeds.txt` from [references/curated-feeds.md](./references/curated-feeds.md)
+and `taste.md` from [references/taste-template.md](./references/taste-template.md)
+when those files are missing, and initializes empty `seen.txt`, `shown.jsonl`,
+and `feed-health.json` on demand. Idempotent: a second run on an initialized
+install changes nothing. Tell the user to edit `taste.md` (without it, scoring
+is meaningless). Do not mkdir or copy these files by hand — this command is
+the only setup path.
 
 ### Step 1: Idempotency guard
 If `~/.daily-curator/digests/<today>.md` already exists and `force_regen` is
@@ -192,7 +205,7 @@ feed — including the third-party Anthropic Engineering scraper — trends stal
 - Run the scripts; do not re-implement their logic inline.
 
 ## References
-- [scripts/curate.py](./scripts/curate.py) — prepare / select / mark-seen / roundup
+- [scripts/curate.py](./scripts/curate.py) — bootstrap / prepare / select / mark-seen / roundup
 - [scripts/health.py](./scripts/health.py) — feed-health tracking + stale-feed alert
 - [scripts/verify-run.py](./scripts/verify-run.py) — pre-delivery invariant check
 - [scripts/canon.py](./scripts/canon.py) — shared URL canonicalization + seen.txt ledger
