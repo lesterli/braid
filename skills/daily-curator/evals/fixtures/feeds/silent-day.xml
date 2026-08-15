@@ -1,0 +1,14 @@
+<?xml version="1.0"?><rss version="2.0"><channel><title>Silent Day</title>
+<item>
+  <title>融资 news that must drop</title>
+  <link>https://ex.com/money</link>
+  <pubDate>{{PUBDATE}}</pubDate>
+  <description>Negative-anchor title.</description>
+</item>
+<item>
+  <title>Stale essay</title>
+  <link>https://ex.com/stale</link>
+  <pubDate>Thu, 01 Jan 2020 08:00:00 GMT</pubDate>
+  <description>Outside the 14-day window.</description>
+</item>
+</channel></rss>

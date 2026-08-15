@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "url": "https://ex.com/fresh-one",
+      "title": "Building a small eval harness",
+      "published": "{{TODAY}}",
+      "summary": "A concrete test fixture for a content day.",
+      "source_bucket": "ex.com",
+      "score": 0.85
+    },
+    {
+      "url": "https://ex.com/fresh-two",
+      "title": "Another fresh artifact",
+      "published": "{{TODAY}}",
+      "summary": "Second in-window item.",
+      "source_bucket": "ex.com",
+      "score": 0.7
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0"?><rss version="2.0"><channel><title>Content Day</title>
+<item>
+  <title>Building a small eval harness</title>
+  <link>https://ex.com/fresh-one</link>
+  <pubDate>{{PUBDATE}}</pubDate>
+  <description>A concrete test fixture for a content day.</description>
+</item>
+<item>
+  <title>Another fresh artifact</title>
+  <link>https://ex.com/fresh-two</link>
+  <pubDate>{{PUBDATE}}</pubDate>
+  <description>Second in-window item.</description>
+</item>
+</channel></rss>

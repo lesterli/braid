@@ -1,0 +1,3 @@
+{"url": "https://ex.com/week-high", "title": "High score", "source_bucket": "ex.com", "published": "{{DAYS_AGO:2}}", "summary": "best", "score": 0.95, "date_shown": "{{DAYS_AGO:2}}"}
+{"url": "https://ex.com/week-mid", "title": "Mid score", "source_bucket": "ex.com", "published": "{{DAYS_AGO:3}}", "summary": "ok", "score": 0.7, "date_shown": "{{DAYS_AGO:3}}"}
+{"url": "https://ex.com/week-old", "title": "Too old", "source_bucket": "ex.com", "published": "{{DAYS_AGO:20}}", "summary": "out", "score": 0.99, "date_shown": "{{DAYS_AGO:20}}"}

@@ -1,0 +1,1 @@
+{"url": "https://ex.com/already-shown", "date_shown": "{{DAYS_AGO:2}}"}
