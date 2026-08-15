@@ -17,9 +17,8 @@ A short reading brief. The skill is split into two halves:
 
 - **Mechanics (deterministic, shipped scripts — never improvise these).**
   `scripts/curate.py` fetches, canonicalizes URLs, dedups against `seen.txt`,
-  drops stale + negative-anchor items, then selects the top picks. `migrate.py`
-  and `verify-run.py` handle cutover and pre-delivery checks. Run them, do not
-  re-author them.
+  drops stale + negative-anchor items, then selects the top picks.
+  `verify-run.py` handles pre-delivery checks. Run them, do not re-author them.
 - **Judgment (yours).** Between `prepare` and `select`, you score each candidate
   0–1 against `taste.md` and later write the one-line "why it matters". That is
   the only part that needs a model.
@@ -195,7 +194,6 @@ feed — including the third-party Anthropic Engineering scraper — trends stal
 ## References
 - [scripts/curate.py](./scripts/curate.py) — prepare / select / mark-seen / roundup
 - [scripts/health.py](./scripts/health.py) — feed-health tracking + stale-feed alert
-- [scripts/migrate.py](./scripts/migrate.py) — one-shot v2→v3 state migration
 - [scripts/verify-run.py](./scripts/verify-run.py) — pre-delivery invariant check
 - [scripts/canon.py](./scripts/canon.py) — shared URL canonicalization + seen.txt ledger
 - [scripts/tests/](./scripts/tests/) — `python3 -m unittest` suite
@@ -203,20 +201,3 @@ feed — including the third-party Anthropic Engineering scraper — trends stal
 - [references/curated-feeds.md](./references/curated-feeds.md) — built-in source list & tiers
 - [references/scoring-and-filtering.md](./references/scoring-and-filtering.md) — scoring guidance
 - [references/taste-template.md](./references/taste-template.md) — starter `taste.md`
-
-## Migration from v2 (2026-06)
-v2 kept a persistent `queued.txt` + `read.txt` with spillover, TTL/taste GC, a
-mark-read flow, and a two-section digest with hidden `_scores`/YAML frontmatter.
-In practice the queue silted (nobody marks read on a one-way push channel), the
-same items recycled for days, and the LLM-authored scorer collapsed to a
-constant. v3 replaces all of it with one `seen.txt` dedup ledger, deterministic
-shipped scripts, a silent-unless-fresh gate, and a clean human-only digest.
-
-Run once at cutover:
-```bash
-python3 scripts/migrate.py --dry-run   # preview: seeds seen.txt, purges tmp bloat
-python3 scripts/migrate.py             # backs up queued/read, seeds seen.txt, reclaims disk
-```
-Removed: `queued.txt`, `read.txt`, `queue-gc.sh`, `mark-read.sh`, the `mode`
-(v2-internal), `queue_ttl_days`, `show`, `debug_scores` inputs, the `q × r`
-formula, tracks, hidden `_scores`, and YAML frontmatter.

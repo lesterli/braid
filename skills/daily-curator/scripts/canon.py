@@ -3,7 +3,7 @@
 
 The load-bearing correctness of the whole skill rests on two things living in
 ONE place: URL canonicalization (so dedup never leaks) and the seen.txt ledger
-(the only persistent state in v3). curate.py, migrate.py, and verify-run.py all
+(the only persistent state in v3). curate.py and verify-run.py all
 import from here so they can never disagree about what "the same URL" means.
 
 seen.txt format
@@ -116,7 +116,7 @@ def _utc_date(dt: datetime) -> date:
 def read_jsonl(path: str):
     """Yield parsed objects from a JSONL file, tolerant of blank/malformed lines
     and a missing file. One place for the parse-tolerance rules so every reader
-    (seen ledger, migration, shown ledger) agrees."""
+    (seen ledger, shown ledger) agrees."""
     if not path or not os.path.exists(path):
         return
     with open(path, "r", encoding="utf-8") as fh:
