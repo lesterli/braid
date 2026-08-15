@@ -1,6 +1,6 @@
 # Curated Feeds
 
-Starter template and quality tier reference. When a user first says "今日推荐" and has no `~/.daily-curator/feeds.txt` yet, these feeds are used as the default source list.
+Starter template and quality tier reference. First-run `curate.py bootstrap` seeds `~/.daily-curator/feeds.txt` from the tables below.
 
 Source quality is reflected in the LLM relevance score (via taste.md's positive anchors), **not** as a mechanical multiplier or tiebreaker — the deterministic ranking tiebreaker is recency (see scoring-and-filtering.md). This file is the bootstrap default feed set and a human reference for which sources are "known".
 
@@ -57,4 +57,4 @@ Common user actions — all persisted to `feeds.txt`:
 - "取消关注 example.com" → remove matching line
 - "导入 OPML https://..." → extract all feed URLs via `scripts/import-opml.sh` and append
 
-If `feeds.txt` doesn't exist yet, the agent uses the tables above as the default starter set. On first "关注" or OPML import, the agent creates `feeds.txt` — seeded with the defaults above plus the user's addition.
+If `feeds.txt` is missing, run `curate.py bootstrap` — that is the only setup path. "关注" and OPML import then append to the existing file.

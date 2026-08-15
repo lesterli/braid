@@ -31,6 +31,7 @@ has one correct answer, so it never gets re-improvised per run.
                                               append shown URLs to seen.txt
 
 Subcommands:
+  bootstrap  first-run setup: seed feeds/taste, create empty state (idempotent)
   prepare    fetch + filter + dedup; prune seen; snapshot seen; write candidates
   select     scored.json -> selected.json (floor, rank, same-source cap, top-N)
   mark-seen  append selected URLs to seen.txt (call only after a real delivery)
@@ -322,6 +323,96 @@ def collect_week(home: str, days: int, today: date) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# First-run bootstrap (the only setup path)
+# ---------------------------------------------------------------------------
+def skill_dir() -> str:
+    """Directory that contains SKILL.md (parent of scripts/). Not cwd."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def extract_feed_urls(markdown: str) -> list[str]:
+    """Pull unique backtick-wrapped http(s) URLs from curated-feeds.md, in order."""
+    urls: list[str] = []
+    seen: set[str] = set()
+    for match in re.finditer(r"`(https?://[^`\s]+)`", markdown):
+        url = match.group(1)
+        if url not in seen:
+            seen.add(url)
+            urls.append(url)
+    return urls
+
+
+def _write_new(path: str, content: str) -> bool:
+    """Write `content` only if `path` does not already exist. Returns True if created."""
+    if os.path.exists(path):
+        return False
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(content)
+    return True
+
+
+def cmd_bootstrap(args) -> int:
+    """Create the state dir, seed user files if missing, init empty ledgers.
+
+    Idempotent: a second run on an initialized install rewrites nothing.
+    """
+    home = state_home(args.home)
+    refs = os.path.join(skill_dir(), "references")
+    created: list[str] = []
+
+    os.makedirs(os.path.join(home, "digests"), exist_ok=True)
+    os.makedirs(os.path.join(home, "tmp"), exist_ok=True)
+
+    feeds_path = os.path.join(home, "feeds.txt")
+    if not os.path.exists(feeds_path):
+        curated = os.path.join(refs, "curated-feeds.md")
+        try:
+            with open(curated, encoding="utf-8") as fh:
+                urls = extract_feed_urls(fh.read())
+        except OSError as exc:
+            print(f"[error] cannot read curated feeds {curated}: {exc}", file=sys.stderr)
+            return 2
+        if not urls:
+            print(f"[error] no feed URLs in {curated}", file=sys.stderr)
+            return 2
+        with open(feeds_path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(urls) + "\n")
+        created.append("feeds.txt")
+
+    taste_path = os.path.join(home, "taste.md")
+    if not os.path.exists(taste_path):
+        template = os.path.join(refs, "taste-template.md")
+        try:
+            with open(template, encoding="utf-8") as fh:
+                body = fh.read()
+        except OSError as exc:
+            print(f"[error] cannot read taste template {template}: {exc}", file=sys.stderr)
+            return 2
+        with open(taste_path, "w", encoding="utf-8") as fh:
+            fh.write(body)
+        created.append("taste.md")
+
+    if _write_new(os.path.join(home, "seen.txt"), ""):
+        created.append("seen.txt")
+    if _write_new(os.path.join(home, SHOWN_FILE), ""):
+        created.append(SHOWN_FILE)
+
+    health_path = os.path.join(home, health.HEALTH_FILE)
+    if not os.path.exists(health_path):
+        with open(health_path, "w", encoding="utf-8") as fh:
+            json.dump({"feeds": {}, "updated": ""}, fh, ensure_ascii=False, indent=2)
+            fh.write("\n")
+        created.append(health.HEALTH_FILE)
+
+    if created:
+        print(f"[bootstrap] initialized {home}: {', '.join(created)}", file=sys.stderr)
+    else:
+        print(f"[bootstrap] already initialized: {home}", file=sys.stderr)
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Paths + tmp hygiene
 # ---------------------------------------------------------------------------
 def _prune_tmp(tmp_dir: str, keep: int = TMP_KEEP_RUNS) -> None:
@@ -455,6 +546,11 @@ def cmd_roundup(args) -> int:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="daily-curator v3 deterministic pipeline")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    pb = sub.add_parser("bootstrap",
+                        help="first-run setup: seed feeds/taste, create empty state")
+    pb.add_argument("--home")
+    pb.set_defaults(func=cmd_bootstrap)
 
     pp = sub.add_parser("prepare", help="fetch + filter + dedup -> candidates.json")
     pp.add_argument("--home")
