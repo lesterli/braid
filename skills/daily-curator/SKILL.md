@@ -4,7 +4,8 @@ description: >-
   Curate a short daily reading brief: fetch new RSS items, dedup against what
   you've already been shown, score the survivors against your taste profile, and
   deliver only the genuinely fresh picks — staying silent on days with nothing
-  worth your time. Persists a single seen.txt dedup ledger across runs.
+  worth your time. Persists two ledgers across runs: seen.txt (dedup) and
+  shown.jsonl (shown items plus scores, for the weekly roundup).
   Use when the user says "今日推荐", "今天读什么", "daily reads", "morning briefing",
   "推荐文章", "每日推荐", "本周精选", "weekly roundup", or invokes "$daily-curator".
   Does NOT manage RSS subscriptions beyond simple feeds.txt edits, set up a feed
@@ -76,8 +77,8 @@ Created empty on first bootstrap; later runs fill them in. Do not seed these by 
 
 | File | Purpose |
 |---|---|
-| `$DAILY_CURATOR_HOME/seen.txt` | JSONL dedup ledger of shown URLs (auto-pruned to 30d) |
-| `$DAILY_CURATOR_HOME/shown.jsonl` | JSONL ledger of shown items |
+| `$DAILY_CURATOR_HOME/seen.txt` | Dedup ledger: JSONL `{url, date_shown}`. Answers "have I already shown this URL?" Auto-pruned to 30d. |
+| `$DAILY_CURATOR_HOME/shown.jsonl` | Shown-item ledger: JSONL rows including `score`. `roundup` reads this (not digest prose) to rank the weekly brief. |
 | `$DAILY_CURATOR_HOME/feed-health.json` | Per-feed fetch health |
 | `$DAILY_CURATOR_HOME/digests/YYYY-MM-DD.md` | Daily digest (UTC date) |
 | `$DAILY_CURATOR_HOME/tmp/candidates-YYYY-MM-DD.json` | `prepare` output (UTC date) |
@@ -219,9 +220,10 @@ goes dark for a week (and a 7-day silence then means something is broken).
 ```bash
 python3 "$SKILL_DIR/scripts/curate.py" roundup --days 7 --home "$DAILY_CURATOR_HOME"
 ```
-`roundup` reads `$DAILY_CURATOR_HOME/shown.jsonl` and prints the week's shown
-items ranked best-first (by score) to stdout. Pick the 3–5 strongest — no new
-scoring — and write a short "本周精选" brief in the weekly format (see
+`roundup` reads `$DAILY_CURATOR_HOME/shown.jsonl` — not `digests/*.md` — and
+prints the week's shown items ranked best-first by the **persisted** `score`
+field. Pick the 3–5 strongest — no new scoring — and write a short "本周精选"
+brief in the weekly format (see
 [references/output-format.md](./references/output-format.md)). Write it to
 `$DAILY_CURATOR_HOME/digests/YYYY-MM-DD-weekly.md` (UTC today; a distinct name
 so it never collides with the daily file or the daily idempotency guard). If the
