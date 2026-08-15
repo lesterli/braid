@@ -1,0 +1,12 @@
+{
+  "candidates": [
+    {
+      "url": "https://ex.com/low",
+      "title": "Thin roundup",
+      "published": "{{TODAY}}",
+      "summary": "no artifact",
+      "source_bucket": "ex.com",
+      "score": 0.15
+    }
+  ]
+}
