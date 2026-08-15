@@ -1,7 +1,7 @@
-# Scoring & Filtering (v3)
+# Scoring & Filtering
 
 One relevance score per item, a cheap pre-filter before any LLM work, and a low
-floor that doubles as the silence gate. No persisted scores, no queue, no `q × r`.
+floor that doubles as the silence gate.
 
 ## Pipeline
 
@@ -30,7 +30,7 @@ Applied in order; survivors become the candidate set:
 
 Read `taste.md`. Score each candidate for relevance to the user's taste by
 **relative ranking anchored to examples**, not an absolute guess (an unanchored
-absolute score is what collapsed v2 to a constant):
+absolute score collapses to a constant):
 
 1. Anchor first. Pick 2–3 reference points from `taste.md`:
    primary-axis + positive-anchor ≈ **0.9**, borderline tertiary ≈ **0.5**,

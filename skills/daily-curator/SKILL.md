@@ -31,11 +31,11 @@ prepare (script) ──▶ candidates.json ──▶ [you score 0–1] ──▶
             [you write the digest prose] ──▶ mark-seen (script) ──▶ verify (script) ──▶ deliver
 ```
 
-Why no queue: most positive-anchor sources publish weekly or slower, so on many
-days there is nothing genuinely new. v3 handles that by staying **silent**, not
-by recycling a stale queue. An item shown once is recorded in `seen.txt` and
-never shown again; an item that doesn't make the cut isn't recorded, so it
-re-competes tomorrow while still inside the 14-day freshness window.
+Most positive-anchor sources publish weekly or slower, so on many days there is
+nothing genuinely new. The skill stays **silent** rather than padding. An item
+shown once is recorded in `seen.txt` and never shown again; an item that doesn't
+make the cut isn't recorded, so it re-competes tomorrow while still inside the
+14-day freshness window.
 
 ## Inputs
 
@@ -66,8 +66,8 @@ Conversational feed management (all persist to `feeds.txt`):
 - "导入 OPML https://..." → run `scripts/import-opml.sh`, append URLs
 - "调整口味" / "edit taste" → show `taste.md`, accept edits
 
-(There is no mark-as-read flow in v3 — delivery is one-way, so "read state"
-isn't tracked. `seen.txt` only answers "have I already shown this?".)
+(Delivery is one-way, so read state isn't tracked. `seen.txt` only answers
+"have I already shown this?".)
 
 ## Workflow (daily)
 
@@ -100,7 +100,7 @@ user's taste, then write the candidates back with a `score` field as
 `tmp/scored.json` (same shape as candidates.json).
 
 Score by **relative ranking, anchored to taste.md**, not by guessing an absolute
-number in a vacuum (that is what collapsed v2's scores to a constant):
+number in a vacuum (an unanchored score collapses to a constant):
 
 1. Pick 2–3 anchored exemplars from `taste.md` first — a clear primary-axis +
    positive-anchor item ≈ 0.9, a borderline tertiary item ≈ 0.5, a negative-anchor
@@ -122,8 +122,8 @@ re-compete next run.
 
 ### Step 5: Write the digest (only if there is content)
 If `selected` is non-empty, write the digest as clean human Markdown, starting at
-an H1, **no YAML frontmatter and no hidden score comments** (the v2 machine layer
-is gone). Path: `~/.daily-curator/digests/<today>.md` on a normal run, but
+an H1, **no YAML frontmatter and no hidden score comments**. Path:
+`~/.daily-curator/digests/<today>.md` on a normal run, but
 **`tmp/digest-<today>.md` when `dry_run`** — so a shadow run never creates the
 real file the Step 1 guard keys on. One item per pick:
 ```
@@ -169,7 +169,7 @@ collides with the daily file or the daily idempotency guard). If the week produc
 nothing, send a one-line "本周无新增。" rather than `[SILENT]`.
 
 Note: this heartbeat only holds once the Sunday `mode=weekly` cron entry is
-installed (see the cutover playbook); nothing else triggers the weekly run.
+installed; nothing else triggers the weekly run.
 
 ## Feed health
 `curate.py prepare` records each feed's fetch outcome to `feed-health.json`.
