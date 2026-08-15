@@ -1,9 +1,8 @@
-# Output Format (v3)
+# Output Format
 
 The digest is a single clean, human-readable Markdown document — no YAML
-frontmatter, no hidden `_scores` comments, no tracks. The v2 machine layer (which
-fed an unbuilt `/daily-publisher`) is gone. The file written to disk and the chat
-reply are identical, starting at the H1.
+frontmatter and no hidden `_scores` comments. The file written to disk and the
+chat reply are identical, starting at the H1.
 
 ## File path & naming
 

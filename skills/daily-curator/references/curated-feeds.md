@@ -2,7 +2,7 @@
 
 Starter template and quality tier reference. When a user first says "今日推荐" and has no `~/.daily-curator/feeds.txt` yet, these feeds are used as the default source list.
 
-In v3 source quality is reflected in the LLM relevance score (via taste.md's positive anchors), **not** as a mechanical multiplier or tiebreaker — the deterministic ranking tiebreaker is recency (see scoring-and-filtering.md). This file is the bootstrap default feed set and a human reference for which sources are "known".
+Source quality is reflected in the LLM relevance score (via taste.md's positive anchors), **not** as a mechanical multiplier or tiebreaker — the deterministic ranking tiebreaker is recency (see scoring-and-filtering.md). This file is the bootstrap default feed set and a human reference for which sources are "known".
 
 ## AI & LLM
 
