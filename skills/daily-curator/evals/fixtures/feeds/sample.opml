@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+  <head><title>Sample</title></head>
+  <body>
+    <outline text="Alpha" xmlUrl="https://opml.example/alpha.xml"/>
+    <outline text="Beta" xmlUrl="https://opml.example/beta.xml"/>
+  </body>
+</opml>
