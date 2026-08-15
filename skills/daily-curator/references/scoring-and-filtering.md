@@ -11,8 +11,9 @@ fetch ─▶ canonicalize ─▶ cheap filters (NO LLM) ─▶ LLM relevance 0�
                   freshness + dedup + neg-anchor                    [SILENT] if empty
 ```
 
-The cheap filters and the floor/rank/cap/top-N are done by `scripts/curate.py`
-(`prepare` and `select`). Only the 0–1 relevance score in the middle is yours.
+The cheap filters and the floor/rank/cap/top-N are done by
+`$SKILL_DIR/scripts/curate.py` (`prepare` and `select`). Only the 0–1 relevance
+score in the middle is yours.
 
 ## Cheap filters (curate.py prepare — no tokens)
 
